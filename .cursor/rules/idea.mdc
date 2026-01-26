@@ -1,0 +1,55 @@
+---
+name: idea
+description: This is a new rule
+---
+
+# Overview
+
+💡 MY IDEA: AI-ASSISTED INTERVIEW SYSTEM (HR-CONTROLLED)
+📌 Core Idea
+My idea is to build an AI-assisted interview system where HR stays fully in control, and AI is used only as a support tool, not as a decision-maker.
+The system helps companies save time, standardize evaluations, and conduct scalable interviews, while keeping human judgment at the center.
+🎯 Problem I Am Solving
+Today, companies face these problems:
+Too many resumes to review manually
+Inconsistent resume evaluation
+Limited interviewer availability
+High interview scheduling overhead
+Biased or unstructured interview feedback
+At the same time:
+Fully automated AI hiring systems are risky
+HR teams don’t trust black-box decisions
+✅ My Solution
+I propose a step-by-step AI interview workflow where:
+HR filters resumes manually
+AI evaluates resumes and interviews
+HR makes all final decisions
+AI never rejects or selects candidates on its own.
+🧠 How the System Works (High Level)
+Resumes are already available in the system.
+HR shortlists resumes manually using simple rules.
+AI scores shortlisted resumes using Google Gemini (score + missing skills).
+HR reviews scores and selects candidates.
+Selected candidates receive a selection confirmation email.
+HR team contacts selected candidates for next steps.
+🔑 Key Design Principles
+HR-first approach
+AI as an assistant, not a judge
+Explainable scores and reports
+No automatic rejection
+Clear separation of responsibilities
+🧱 Technology Stack Used
+Frontend: React + TypeScript
+Backend: Python + FastAPI
+Database & Auth: Supabase
+Resume AI: Google Gemini API
+Email: Resend API
+🚀 Why This Idea Is Strong
+✔ Practical and realistic
+✔ Easy to explain to HR teams
+✔ Scales from local setup to production
+✔ Avoids legal and ethical risks
+✔ Suitable for a final-year engineering project
+✔ Can be extended into a real startup product
+🏁 One-Line Summary (Your Signature Line)
+An AI-assisted interview system where HR controls the hiring process, AI evaluates skills, and decisions always remain human.

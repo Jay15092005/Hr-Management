@@ -1,0 +1,169 @@
+.hr-workflow-container {
+  padding: 0;
+}
+
+.workflow-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.workflow-header h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin: 0 0 0.5rem 0;
+}
+
+.workflow-subtitle {
+  color: #666;
+  font-size: 1rem;
+  margin: 0;
+}
+
+.workflow-navigation {
+  margin-top: 2rem;
+  text-align: center;
+}
+
+.workflow-steps {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 3rem;
+  gap: 1rem;
+}
+
+.step-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem 2rem;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 2px solid transparent;
+}
+
+.step-indicator:hover {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.step-indicator.active {
+  border-color: #1976d2;
+  background: #f0f7ff;
+}
+
+.step-number {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #e0e0e0;
+  color: #666;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 1.1rem;
+  transition: all 0.2s;
+}
+
+.step-indicator.active .step-number {
+  background: #1976d2;
+  color: white;
+}
+
+.step-label {
+  font-weight: 500;
+  color: #666;
+  font-size: 0.95rem;
+}
+
+.step-indicator.active .step-label {
+  color: #1976d2;
+  font-weight: 600;
+}
+
+.step-connector {
+  width: 60px;
+  height: 2px;
+  background: #e0e0e0;
+}
+
+.workflow-content {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.workflow-section {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.filter-results {
+  background: white;
+  border-radius: 12px;
+  padding: 2rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  text-align: center;
+}
+
+.filter-results h3 {
+  margin: 0 0 1.5rem 0;
+  font-size: 1.5rem;
+  color: #1a1a1a;
+}
+
+.evaluation-setup {
+  margin-bottom: 2rem;
+}
+
+.evaluation-results {
+  margin-top: 2rem;
+}
+
+.info-box {
+  background: #e3f2fd;
+  color: #1976d2;
+  padding: 2rem;
+  border-radius: 12px;
+  text-align: center;
+  font-size: 1rem;
+}
+
+.btn-primary {
+  padding: 0.875rem 2rem;
+  background: #1976d2;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #1565c0;
+}
+
+@media (max-width: 768px) {
+  .workflow-steps {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .step-connector {
+    width: 2px;
+    height: 40px;
+  }
+
+  .step-indicator {
+    width: 100%;
+    flex-direction: row;
+    justify-content: flex-start;
+  }
+}

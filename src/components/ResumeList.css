@@ -1,0 +1,143 @@
+.resume-list-container {
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 0;
+}
+
+.resume-list-header {
+  margin-bottom: 2rem;
+}
+
+.resume-list-header h1 {
+  font-size: 2rem;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin: 0 0 0.5rem 0;
+}
+
+.subtitle {
+  color: #666;
+  font-size: 1rem;
+  margin: 0;
+}
+
+.loading,
+.error {
+  text-align: center;
+  padding: 3rem;
+  font-size: 1.1rem;
+}
+
+.error {
+  color: #d32f2f;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 4rem 2rem;
+  background: #f5f5f5;
+  border-radius: 8px;
+}
+
+.empty-state p {
+  margin: 0.5rem 0;
+  color: #666;
+}
+
+.hint {
+  font-size: 0.9rem;
+  color: #999;
+}
+
+.resume-table-container {
+  overflow-x: auto;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.resume-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.resume-table thead {
+  background: #f8f9fa;
+}
+
+.resume-table th {
+  padding: 1rem;
+  text-align: left;
+  font-weight: 600;
+  color: #333;
+  border-bottom: 2px solid #e0e0e0;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.resume-table td {
+  padding: 1rem;
+  border-bottom: 1px solid #f0f0f0;
+  color: #333;
+}
+
+.resume-table tbody tr:hover {
+  background: #f8f9fa;
+}
+
+.resume-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.name-cell {
+  font-weight: 500;
+}
+
+.email-cell {
+  color: #666;
+}
+
+.date-cell {
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.resume-link {
+  color: #1976d2;
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.resume-link:hover {
+  color: #1565c0;
+  text-decoration: underline;
+}
+
+.file-icon {
+  font-size: 1rem;
+}
+
+.no-file {
+  color: #999;
+  font-style: italic;
+}
+
+@media (max-width: 768px) {
+  .resume-list-container {
+    padding: 1rem;
+  }
+
+  .resume-table {
+    font-size: 0.9rem;
+  }
+
+  .resume-table th,
+  .resume-table td {
+    padding: 0.75rem 0.5rem;
+  }
+}
