@@ -14,6 +14,15 @@ export default function HRReview({ jobDescription }: HRReviewProps) {
   const [error, setError] = useState<string | null>(null)
   const [processing, setProcessing] = useState<string | null>(null)
   const [schedulingCandidate, setSchedulingCandidate] = useState<CandidateWithScore | null>(null)
+  const [instantInterviewCandidate, setInstantInterviewCandidate] = useState<CandidateWithScore | null>(null)
+  const [instantInterviewLoading, setInstantInterviewLoading] = useState(false)
+  const [instantInterviewError, setInstantInterviewError] = useState<string | null>(null)
+  const [instantInterviewFormData, setInstantInterviewFormData] = useState({
+    interview_type: 'Python',
+    difficulty_level: 'Medium' as 'Easy' | 'Medium' | 'Hard',
+    duration_minutes: 60,
+    coding_round: false,
+  })
 
   useEffect(() => {
     if (jobDescription) {
@@ -267,6 +276,76 @@ export default function HRReview({ jobDescription }: HRReviewProps) {
     fetchCandidatesWithScores()
   }
 
+  const handleInstantInterview = (candidate: CandidateWithScore) => {
+    if (!candidate.selection) return
+    setInstantInterviewCandidate(candidate)
+    setInstantInterviewError(null)
+    setInstantInterviewFormData({
+      interview_type: 'Python',
+      difficulty_level: 'Medium',
+      duration_minutes: 60,
+      coding_round: false,
+    })
+  }
+
+  const handleInstantInterviewClose = () => {
+    setInstantInterviewCandidate(null)
+    setInstantInterviewError(null)
+  }
+
+  const handleInstantInterviewSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!instantInterviewCandidate || !instantInterviewCandidate.selection || !jobDescription) return
+
+    setInstantInterviewLoading(true)
+    setInstantInterviewError(null)
+
+    try {
+      // Call the instant interview edge function
+      const { data, error } = await supabase.functions.invoke('create-instant-interview', {
+        body: {
+          candidate_selection_id: instantInterviewCandidate.selection.id,
+          interview_type: instantInterviewFormData.interview_type,
+          difficulty_level: instantInterviewFormData.difficulty_level,
+          duration_minutes: instantInterviewFormData.duration_minutes,
+          coding_round: instantInterviewFormData.coding_round,
+        },
+      })
+
+      if (error) {
+        throw error
+      }
+
+      if (data?.error) {
+        throw new Error(data.error)
+      }
+
+      if (data?.success) {
+        // Refresh candidates list
+        await fetchCandidatesWithScores()
+        
+        // Show success message and optionally open interview room
+        const joinUrl = data.join_url
+        const shouldOpen = confirm(
+          `Instant interview created successfully!\n\nInterview link sent to ${instantInterviewCandidate.email}\n\nWould you like to open the interview room now?`
+        )
+        
+        if (shouldOpen && joinUrl) {
+          window.open(joinUrl, '_blank')
+        }
+        
+        handleInstantInterviewClose()
+      } else {
+        throw new Error('Failed to create instant interview')
+      }
+    } catch (err) {
+      console.error('Error creating instant interview:', err)
+      setInstantInterviewError(err instanceof Error ? err.message : 'Failed to create instant interview')
+    } finally {
+      setInstantInterviewLoading(false)
+    }
+  }
+
   const getScoreColor = (score: number) => {
     if (score >= 80) return '#4caf50'
     if (score >= 60) return '#ff9800'
@@ -437,14 +516,24 @@ export default function HRReview({ jobDescription }: HRReviewProps) {
                         )}
                       </div>
                       {!candidate.interview && (
-                        <button
-                          onClick={() => handleScheduleInterview(candidate)}
-                          className="btn-schedule"
-                          disabled={processing === candidate.id}
-                          title="Schedule interview for this candidate"
-                        >
-                          📅 Schedule Interview
-                        </button>
+                        <div className="action-buttons-group">
+                          <button
+                            onClick={() => handleInstantInterview(candidate)}
+                            className="btn-instant-interview"
+                            disabled={processing === candidate.id}
+                            title="Start instant interview - send link immediately"
+                          >
+                            ⚡ Instant Interview
+                          </button>
+                          <button
+                            onClick={() => handleScheduleInterview(candidate)}
+                            className="btn-schedule"
+                            disabled={processing === candidate.id}
+                            title="Schedule interview for this candidate"
+                          >
+                            📅 Schedule Interview
+                          </button>
+                        </div>
                       )}
                       <button
                         onClick={() => handleResetSelection(candidate)}
@@ -501,6 +590,112 @@ export default function HRReview({ jobDescription }: HRReviewProps) {
           onClose={handleSchedulingClose}
           onSuccess={handleSchedulingSuccess}
         />
+      )}
+
+      {instantInterviewCandidate && instantInterviewCandidate.selection && (
+        <div className="instant-interview-overlay" onClick={handleInstantInterviewClose}>
+          <div className="instant-interview-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="instant-interview-header">
+              <h2>⚡ Instant Interview</h2>
+              <button className="close-button" onClick={handleInstantInterviewClose} type="button">
+                ×
+              </button>
+            </div>
+
+            <form onSubmit={handleInstantInterviewSubmit} className="instant-interview-form">
+              <div className="form-group">
+                <label htmlFor="instant-candidate-name">Candidate</label>
+                <input
+                  id="instant-candidate-name"
+                  type="text"
+                  value={instantInterviewCandidate.name}
+                  disabled
+                  className="form-input disabled"
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="instant-interview-type">Interview Type *</label>
+                <select
+                  id="instant-interview-type"
+                  value={instantInterviewFormData.interview_type}
+                  onChange={(e) => setInstantInterviewFormData((prev) => ({ ...prev, interview_type: e.target.value }))}
+                  className="form-select"
+                  required
+                >
+                  {['Python', 'Node.js', 'Java', 'React', 'Angular', 'Vue.js', 'Go', 'Rust', 'C++', 'Other'].map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label htmlFor="instant-difficulty-level">Difficulty Level *</label>
+                  <select
+                    id="instant-difficulty-level"
+                    value={instantInterviewFormData.difficulty_level}
+                    onChange={(e) => setInstantInterviewFormData((prev) => ({ ...prev, difficulty_level: e.target.value as 'Easy' | 'Medium' | 'Hard' }))}
+                    className="form-select"
+                    required
+                  >
+                    {['Easy', 'Medium', 'Hard'].map((level) => (
+                      <option key={level} value={level}>
+                        {level}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="instant-duration">Duration (minutes) *</label>
+                  <select
+                    id="instant-duration"
+                    value={instantInterviewFormData.duration_minutes}
+                    onChange={(e) => setInstantInterviewFormData((prev) => ({ ...prev, duration_minutes: parseInt(e.target.value) }))}
+                    className="form-select"
+                    required
+                  >
+                    {[30, 45, 60, 90, 120].map((duration) => (
+                      <option key={duration} value={duration}>
+                        {duration} min
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={instantInterviewFormData.coding_round}
+                    onChange={(e) => setInstantInterviewFormData((prev) => ({ ...prev, coding_round: e.target.checked }))}
+                    className="form-checkbox"
+                  />
+                  <span>Coding Round</span>
+                </label>
+              </div>
+
+              <div className="instant-interview-warning">
+                ⚠️ This will create an interview room immediately and send the interview link to the candidate right away.
+              </div>
+
+              {instantInterviewError && <div className="error-message">{instantInterviewError}</div>}
+
+              <div className="form-actions">
+                <button type="button" onClick={handleInstantInterviewClose} className="btn-cancel" disabled={instantInterviewLoading}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn-submit-instant" disabled={instantInterviewLoading}>
+                  {instantInterviewLoading ? 'Creating...' : '⚡ Create Instant Interview'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   )

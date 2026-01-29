@@ -237,13 +237,17 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // Generate join link - use application URL instead of VideoSDK API URL
+    const appUrl = Deno.env.get("APP_URL") || "http://localhost:5173";
+    const joinUrl = `${appUrl}/interview/${roomId}`;
+
     return new Response(
       JSON.stringify({
         success: true,
         message: "Interview room activated successfully",
         interview_id: interview_id,
         room_id: roomId,
-        join_url: `https://api.videosdk.live/meeting/${roomId}`,
+        join_url: joinUrl,
       }),
       {
         status: 200,

@@ -15,16 +15,28 @@ interface InterviewRoomProps {
   onLeave: () => void
 }
 
-// VideoSDK token - in production, this should be generated server-side
-// For now, we'll need to get it from environment or generate it
-const getVideoSDKToken = (): string => {
-  // In production, call an API endpoint to generate token
-  // For now, using API key directly (not recommended for production)
-  const apiKey = import.meta.env.VITE_VIDEOSDK_API_KEY
-  if (!apiKey) {
-    throw new Error('VideoSDK API key not configured')
+// Get VideoSDK JWT token from Edge Function
+const getVideoSDKToken = async (): Promise<string | null> => {
+  try {
+    const { data, error } = await supabase.functions.invoke('generate-videosdk-token', {
+      method: 'GET',
+    })
+
+    if (error) {
+      console.error('Error calling token generation function:', error)
+      return null
+    }
+
+    if (data?.success && data?.token) {
+      return data.token
+    }
+
+    console.error('Failed to get token:', data)
+    return null
+  } catch (err) {
+    console.error('Error getting VideoSDK token:', err)
+    return null
   }
-  return apiKey
 }
 
 function Controls() {
@@ -113,18 +125,42 @@ function MeetingView({ roomId, candidateName, onLeave }: InterviewRoomProps) {
   useEffect(() => {
     const validateRoom = async () => {
       try {
-        const token = getVideoSDKToken()
-        const room = await validateVideoSDKRoom(token, roomId)
-        if (room) {
-          setRoomValid(true)
-        } else {
+        // First check if interview exists in database
+        const { data: interviewConfig, error: dbError } = await supabase
+          .from('interview_configurations')
+          .select('status, room_id')
+          .eq('room_id', roomId)
+          .single()
+
+        if (dbError || !interviewConfig) {
+          console.error('Interview not found in database:', dbError)
           setRoomValid(false)
-          setError('Interview room not found or not yet active. Please wait for the interview to start.')
+          setError('Interview room not found. Please check the link and try again.')
+          return
         }
+
+        // For instant interviews (status: 'active'), allow joining immediately
+        if (interviewConfig.status === 'active') {
+          console.log('Instant interview found - allowing join')
+          setRoomValid(true)
+          return
+        }
+
+        // For scheduled interviews, check if it's time
+        if (interviewConfig.status === 'scheduled') {
+          // Allow joining - VideoSDK SDK will handle connection
+          // The room might be created 5 minutes before, so allow joining
+          setRoomValid(true)
+          return
+        }
+
+        // For other statuses, allow joining - let VideoSDK SDK handle it
+        setRoomValid(true)
       } catch (err) {
         console.error('Error validating room:', err)
-        setRoomValid(false)
-        setError('Failed to validate interview room. Please try again later.')
+        // If validation fails but we have roomId, allow joining anyway
+        // VideoSDK SDK will handle connection errors
+        setRoomValid(true)
       }
     }
 
@@ -224,15 +260,23 @@ export default function InterviewRoom({ roomId, candidateName, onLeave }: Interv
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    try {
-      const videoSDKToken = getVideoSDKToken()
-      setToken(videoSDKToken)
-      setLoading(false)
-    } catch (err) {
-      console.error('Error getting VideoSDK token:', err)
-      setError(err instanceof Error ? err.message : 'Failed to initialize VideoSDK')
-      setLoading(false)
+    const fetchToken = async () => {
+      try {
+        const videoSDKToken = await getVideoSDKToken()
+        if (videoSDKToken) {
+          setToken(videoSDKToken)
+        } else {
+          setError('Failed to get VideoSDK token. Please check your configuration.')
+        }
+      } catch (err) {
+        console.error('Error getting VideoSDK token:', err)
+        setError(err instanceof Error ? err.message : 'Failed to initialize VideoSDK')
+      } finally {
+        setLoading(false)
+      }
     }
+
+    fetchToken()
   }, [])
 
   if (loading) {

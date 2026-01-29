@@ -109,7 +109,10 @@ export async function validateVideoSDKRoom(
 
 /**
  * Get meeting join URL
+ * Returns the application URL for joining the interview room
  */
 export function getMeetingJoinUrl(roomId: string): string {
-  return `https://api.videosdk.live/meeting/${roomId}`
+  // Use environment variable if set, otherwise use current origin
+  const baseUrl = import.meta.env.VITE_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '')
+  return `${baseUrl}/interview/${roomId}`
 }

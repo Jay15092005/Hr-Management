@@ -259,8 +259,10 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Generate join link with actual room ID
-    const joinLink = `https://api.videosdk.live/meeting/${roomId}`;
+    // Generate join link - use application URL instead of VideoSDK API URL
+    // VideoSDK meetings are joined through the application, not directly via API
+    const appUrl = Deno.env.get("APP_URL") || "http://localhost:5173";
+    const joinLink = `${appUrl}/interview/${roomId}`;
 
     // Format interview date and time
     const scheduledDate = new Date(interviewData.scheduled_at);
