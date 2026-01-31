@@ -13,11 +13,13 @@ interface FilterCriteria {
 interface HRFiltersProps {
   onFilteredResumes: (resumes: Resume[]) => void
   onClearFilters: () => void
+  compact?: boolean
 }
 
 export default function HRFilters({
   onFilteredResumes,
   onClearFilters,
+  compact = false,
 }: HRFiltersProps) {
   const [filters, setFilters] = useState<FilterCriteria>({
     minDate: '',
@@ -104,6 +106,56 @@ export default function HRFilters({
       degree: '',
     })
     onClearFilters()
+  }
+
+  if (compact) {
+    return (
+      <div className="hr-filters-container compact">
+        <div className="filters-inline">
+          <div className="filter-item">
+            <label>Date Applied</label>
+            <input
+              type="date"
+              value={filters.minDate}
+              onChange={(e) => handleFilterChange('minDate', e.target.value)}
+            />
+          </div>
+          <div className="filter-item">
+            <label>Before</label>
+            <input
+              type="date"
+              value={filters.maxDate}
+              onChange={(e) => handleFilterChange('maxDate', e.target.value)}
+            />
+          </div>
+          <div className="filter-item">
+            <label>Years</label>
+            <input
+              type="number"
+              min="0"
+              value={filters.minExperience || ''}
+              placeholder="0"
+              onChange={(e) =>
+                handleFilterChange('minExperience', parseInt(e.target.value) || 0)
+              }
+            />
+          </div>
+          <div className="filter-item">
+            <label>Location</label>
+            <input
+              type="text"
+              placeholder="Location"
+              value={filters.location}
+              onChange={(e) => handleFilterChange('location', e.target.value)}
+            />
+          </div>
+          <button onClick={applyFilters} className="btn-apply" disabled={loading}>
+            {loading ? '...' : 'Apply'}
+          </button>
+          <button onClick={clearFilters} className="btn-clear">Clear</button>
+        </div>
+      </div>
+    )
   }
 
   return (

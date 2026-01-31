@@ -220,6 +220,96 @@
   background: #1565c0;
 }
 
+/* Compact layout */
+.ai-scoring-container.compact {
+  margin-bottom: 1rem;
+}
+
+.scoring-header-compact {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.scoring-header-compact .section-title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.btn-evaluate-all {
+  padding: 0.5rem 1rem;
+  background: #1976d2;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.btn-evaluate-all:hover:not(:disabled) {
+  background: #1565c0;
+}
+
+.btn-evaluate-all:disabled {
+  background: #90caf9;
+  cursor: not-allowed;
+}
+
+.scores-list-compact {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.score-row-compact {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.5rem 0.75rem;
+  background: #f9f9f9;
+  border-radius: 4px;
+  border: 1px solid #eee;
+}
+
+.score-row-compact .name {
+  flex: 1;
+  font-weight: 500;
+  color: #333;
+}
+
+.score-row-compact .score-badge {
+  padding: 0.25rem 0.6rem;
+  border-radius: 4px;
+  color: white;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.score-row-compact .btn-eval-one {
+  padding: 0.35rem 0.75rem;
+  background: #e3f2fd;
+  color: #1976d2;
+  border: 1px solid #1976d2;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.score-row-compact .btn-eval-one:hover:not(:disabled) {
+  background: #bbdefb;
+}
+
+.ai-scoring-container.compact .empty-msg {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #666;
+}
+
 @media (max-width: 768px) {
   .scores-grid {
     grid-template-columns: 1fr;

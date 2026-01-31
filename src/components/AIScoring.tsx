@@ -7,9 +7,10 @@ import './AIScoring.css'
 interface AIScoringProps {
   resumes: Resume[]
   jobDescription: JobDescription | null
+  compact?: boolean
 }
 
-export default function AIScoring({ resumes, jobDescription }: AIScoringProps) {
+export default function AIScoring({ resumes, jobDescription, compact = false }: AIScoringProps) {
   const [evaluating, setEvaluating] = useState<string | null>(null)
   const [scores, setScores] = useState<Map<string, ResumeScore>>(new Map())
   const [error, setError] = useState<string | null>(null)
@@ -155,6 +156,48 @@ export default function AIScoring({ resumes, jobDescription }: AIScoringProps) {
         <div className="info-message">
           Please select a job description to start AI evaluation
         </div>
+      </div>
+    )
+  }
+
+  if (compact) {
+    return (
+      <div className="ai-scoring-container compact">
+        <div className="scoring-header-compact">
+          <h2 className="section-title">Person Name</h2>
+          {resumes.length > 0 && (
+            <button onClick={evaluateAllResumes} className="btn-evaluate-all" disabled={evaluating !== null}>
+              {evaluating ? 'Evaluating...' : 'Evaluate All'}
+            </button>
+          )}
+        </div>
+        {error && <div className="error-message">{error}</div>}
+        <div className="scores-list-compact">
+          {resumes.map((resume) => {
+            const score = scores.get(resume.id)
+            const isEvaluating = evaluating === resume.id
+            return (
+              <div key={resume.id} className="score-row-compact">
+                <span className="name">{resume.name}</span>
+                {score ? (
+                  <span className="score-badge" style={{ backgroundColor: getScoreColor(score.score) }}>
+                    {score.score}/100
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn-eval-one"
+                    onClick={() => evaluateResume(resume)}
+                    disabled={!resume.resume_file_url || evaluating !== null}
+                  >
+                    {isEvaluating ? '...' : 'Evaluate'}
+                  </button>
+                )}
+              </div>
+            )
+          })}
+        </div>
+        {resumes.length === 0 && <p className="empty-msg">No resumes. Apply filters first.</p>}
       </div>
     )
   }

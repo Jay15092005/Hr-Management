@@ -6,13 +6,15 @@ import './HRReview.css'
 
 interface HRReviewProps {
   jobDescription: JobDescription | null
+  compact?: boolean
 }
 
-export default function HRReview({ jobDescription }: HRReviewProps) {
+export default function HRReview({ jobDescription, compact = false }: HRReviewProps) {
   const [candidates, setCandidates] = useState<CandidateWithScore[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [processing, setProcessing] = useState<string | null>(null)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
   const [schedulingCandidate, setSchedulingCandidate] = useState<CandidateWithScore | null>(null)
   const [instantInterviewCandidate, setInstantInterviewCandidate] = useState<CandidateWithScore | null>(null)
   const [instantInterviewLoading, setInstantInterviewLoading] = useState(false)
@@ -374,6 +376,201 @@ export default function HRReview({ jobDescription }: HRReviewProps) {
     return (
       <div className="hr-review-container">
         <div className="error-message">{error}</div>
+      </div>
+    )
+  }
+
+  if (compact) {
+    return (
+      <div className="hr-review-container compact">
+        <h2 className="section-title">Person Name</h2>
+        {candidates.length === 0 ? (
+          <p className="empty-msg">No candidates evaluated yet. Evaluate resumes above.</p>
+        ) : (
+          <div className="candidates-list-compact">
+            {candidates.map((candidate) => (
+              <div key={candidate.id} className="candidate-row-compact">
+                <a
+                  href={candidate.resume_file_url || '#'}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn-view-resume-show"
+                >
+                  View Resume show
+                </a>
+                {candidate.score ? (
+                  <span
+                    className="score-badge-compact"
+                    style={{ backgroundColor: getScoreColor(candidate.score.score) }}
+                  >
+                    {candidate.score.score}/100
+                  </span>
+                ) : (
+                  <span className="score-placeholder">—/100</span>
+                )}
+                <button
+                  type="button"
+                  className="btn-view-more"
+                  onClick={() => setExpandedId(expandedId === candidate.id ? null : candidate.id)}
+                >
+                  {expandedId === candidate.id ? 'Hide' : 'View more'}
+                </button>
+                {expandedId === candidate.id && (
+                  <div className="candidate-expanded">
+                    <p className="candidate-email">{candidate.email}</p>
+                    <div className="detail-item">
+                      <span className="label">Application Date:</span>
+                      <span className="value">{formatDate(candidate.date_of_application)}</span>
+                    </div>
+                    {candidate.years_of_experience != null && (
+                      <div className="detail-item">
+                        <span className="label">Experience:</span>
+                        <span className="value">{candidate.years_of_experience} years</span>
+                      </div>
+                    )}
+                    {candidate.score?.summary && (
+                      <div className="score-summary">
+                        <strong>Summary:</strong> {candidate.score.summary}
+                      </div>
+                    )}
+                    <div className="action-buttons-expanded">
+                      {candidate.selection?.status === 'selected' ? (
+                        <>
+                          <span className="status-badge selected">✓ Selected</span>
+                          {!candidate.interview && (
+                            <>
+                              <button
+                                onClick={() => handleInstantInterview(candidate)}
+                                className="btn-instant-interview"
+                                disabled={processing === candidate.id}
+                              >
+                                ⚡ Instant Interview
+                              </button>
+                              <button
+                                onClick={() => handleScheduleInterview(candidate)}
+                                className="btn-schedule"
+                                disabled={processing === candidate.id}
+                              >
+                                📅 Schedule
+                              </button>
+                            </>
+                          )}
+                          <button onClick={() => handleResetSelection(candidate)} className="btn-reset" disabled={processing === candidate.id}>
+                            🔄 Reset
+                          </button>
+                        </>
+                      ) : candidate.selection?.status === 'rejected' ? (
+                        <>
+                          <span className="status-badge rejected">✗ Rejected</span>
+                          <button onClick={() => handleResetSelection(candidate)} className="btn-reset" disabled={processing === candidate.id}>
+                            🔄 Reset
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button onClick={() => handleSelect(candidate)} className="btn-select" disabled={processing === candidate.id}>
+                            {processing === candidate.id ? '...' : '✓ Select'}
+                          </button>
+                          <button onClick={() => handleReject(candidate)} className="btn-reject" disabled={processing === candidate.id}>
+                            ✗ Reject
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+        {schedulingCandidate && schedulingCandidate.selection && (
+          <InterviewScheduler
+            candidateSelection={schedulingCandidate.selection}
+            candidateName={schedulingCandidate.name}
+            candidateEmail={schedulingCandidate.email}
+            jobTitle={jobDescription.title}
+            onClose={handleSchedulingClose}
+            onSuccess={handleSchedulingSuccess}
+          />
+        )}
+        {instantInterviewCandidate && instantInterviewCandidate.selection && (
+          <div className="instant-interview-overlay" onClick={handleInstantInterviewClose}>
+            <div className="instant-interview-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="instant-interview-header">
+                <h2>⚡ Instant Interview</h2>
+                <button className="close-button" onClick={handleInstantInterviewClose} type="button">×</button>
+              </div>
+              <form onSubmit={handleInstantInterviewSubmit} className="instant-interview-form">
+                <div className="form-group">
+                  <label>Candidate</label>
+                  <input type="text" value={instantInterviewCandidate.name} disabled className="form-input disabled" />
+                </div>
+                <div className="form-group">
+                  <label>Interview Type *</label>
+                  <select
+                    value={instantInterviewFormData.interview_type}
+                    onChange={(e) => setInstantInterviewFormData((p) => ({ ...p, interview_type: e.target.value }))}
+                    className="form-select"
+                    required
+                  >
+                    {['Python', 'Node.js', 'Java', 'React', 'Angular', 'Vue.js', 'Go', 'Rust', 'C++', 'Other'].map((t) => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Difficulty *</label>
+                    <select
+                      value={instantInterviewFormData.difficulty_level}
+                      onChange={(e) => setInstantInterviewFormData((p) => ({ ...p, difficulty_level: e.target.value as 'Easy' | 'Medium' | 'Hard' }))}
+                      className="form-select"
+                      required
+                    >
+                      {['Easy', 'Medium', 'Hard'].map((l) => (
+                        <option key={l} value={l}>{l}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Duration (min) *</label>
+                    <select
+                      value={instantInterviewFormData.duration_minutes}
+                      onChange={(e) => setInstantInterviewFormData((p) => ({ ...p, duration_minutes: parseInt(e.target.value) }))}
+                      className="form-select"
+                      required
+                    >
+                      {[30, 45, 60, 90, 120].map((d) => (
+                        <option key={d} value={d}>{d} min</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={instantInterviewFormData.coding_round}
+                      onChange={(e) => setInstantInterviewFormData((p) => ({ ...p, coding_round: e.target.checked }))}
+                      className="form-checkbox"
+                    />
+                    <span>Coding Round</span>
+                  </label>
+                </div>
+                <div className="instant-interview-warning">
+                  This will create an interview room and send the link immediately.
+                </div>
+                {instantInterviewError && <div className="error-message">{instantInterviewError}</div>}
+                <div className="form-actions">
+                  <button type="button" onClick={handleInstantInterviewClose} className="btn-cancel" disabled={instantInterviewLoading}>Cancel</button>
+                  <button type="submit" className="btn-submit-instant" disabled={instantInterviewLoading}>
+                    {instantInterviewLoading ? 'Creating...' : '⚡ Create Instant Interview'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     )
   }

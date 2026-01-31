@@ -175,6 +175,205 @@
   cursor: not-allowed;
 }
 
+/* Compact layout */
+.job-description-container.compact {
+  margin-bottom: 1.5rem;
+}
+
+.job-description-container.compact .section-title {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin: 0 0 0.75rem 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.job-description-container.compact .btn-show-full {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.85rem;
+  background: #f5f5f5;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: normal;
+}
+
+.job-description-container.compact .btn-show-full:hover {
+  background: #eee;
+}
+
+.job-list-oneline {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.job-oneline {
+  padding: 0.6rem 0.75rem;
+  background: #f9f9f9;
+  border: 1px solid #eee;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  color: #333;
+  cursor: pointer;
+}
+
+.job-oneline:hover {
+  background: #f0f0f0;
+}
+
+.job-oneline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.job-oneline-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.job-oneline.selected {
+  background: #e3f2fd;
+  border-color: #1976d2;
+}
+
+.btn-edit-job {
+  flex-shrink: 0;
+  padding: 0.35rem 0.5rem;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  font-size: 1rem;
+  cursor: pointer;
+  opacity: 0.7;
+  line-height: 1;
+}
+
+.btn-edit-job:hover {
+  opacity: 1;
+  background: #eee;
+}
+
+.job-oneline.selected .btn-edit-job:hover {
+  background: #bbdefb;
+}
+
+.job-edit-form-compact {
+  margin-bottom: 1rem;
+  padding: 1rem;
+  background: #fafafa;
+  border: 1px solid #eee;
+  border-radius: 6px;
+}
+
+.job-edit-form-compact h3 {
+  margin: 0 0 0.75rem 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.job-edit-form-compact .form-group {
+  margin-bottom: 0.75rem;
+}
+
+.job-edit-form-compact .form-group label {
+  font-size: 0.85rem;
+}
+
+.job-edit-form-compact .form-group input,
+.job-edit-form-compact .form-group textarea {
+  padding: 0.5rem 0.6rem;
+  font-size: 0.9rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.job-edit-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.btn-cancel-edit {
+  padding: 0.5rem 1rem;
+  background: #f5f5f5;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.btn-cancel-edit:hover {
+  background: #eee;
+}
+
+.btn-save-job {
+  padding: 0.5rem 1rem;
+  background: #1976d2;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.btn-save-job:hover:not(:disabled) {
+  background: #1565c0;
+}
+
+.btn-save-job:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.job-full-article {
+  padding: 1rem;
+  background: #fafafa;
+  border: 1px solid #eee;
+  border-radius: 6px;
+  margin-bottom: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.job-full-article h3 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1rem;
+}
+
+.job-description-container.compact .empty-msg {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.job-description-container.compact .btn-apply-job {
+  padding: 0.6rem 2rem;
+  background: #1976d2;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  letter-spacing: 0.05em;
+}
+
+.job-description-container.compact .btn-apply-job:hover:not(:disabled) {
+  background: #1565c0;
+}
+
+.job-description-container.compact .btn-apply-job:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
 @media (max-width: 768px) {
   .job-description-header {
     flex-direction: column;

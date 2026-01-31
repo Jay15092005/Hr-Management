@@ -2,6 +2,119 @@
   margin-bottom: 2rem;
 }
 
+/* Compact layout */
+.hr-review-container.compact .section-title {
+  margin: 0 0 0.75rem 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.hr-review-container.compact .empty-msg {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.candidates-list-compact {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.candidate-row-compact {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  background: #f9f9f9;
+  border: 1px solid #eee;
+  border-radius: 6px;
+}
+
+.btn-view-resume-show {
+  font-size: 0.9rem;
+  color: #1976d2;
+  text-decoration: none;
+}
+
+.btn-view-resume-show:hover {
+  text-decoration: underline;
+}
+
+.score-badge-compact {
+  padding: 0.25rem 0.6rem;
+  border-radius: 4px;
+  color: white;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.score-placeholder {
+  color: #999;
+  font-size: 0.9rem;
+}
+
+.btn-view-more {
+  padding: 0.35rem 0.75rem;
+  background: #f5f5f5;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  margin-left: auto;
+}
+
+.btn-view-more:hover {
+  background: #eee;
+}
+
+.candidate-expanded {
+  width: 100%;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #eee;
+  font-size: 0.9rem;
+}
+
+.candidate-expanded .candidate-email {
+  margin: 0 0 0.5rem 0;
+  color: #666;
+}
+
+.candidate-expanded .detail-item {
+  margin-bottom: 0.35rem;
+}
+
+.candidate-expanded .score-summary {
+  margin: 0.5rem 0;
+  line-height: 1.4;
+}
+
+.action-buttons-expanded {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.action-buttons-expanded .status-badge {
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+}
+
+.action-buttons-expanded .btn-instant-interview,
+.action-buttons-expanded .btn-schedule,
+.action-buttons-expanded .btn-reset,
+.action-buttons-expanded .btn-select,
+.action-buttons-expanded .btn-reject {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.85rem;
+}
+
 .review-header {
   margin-bottom: 2rem;
 }
