@@ -1,0 +1,16 @@
+# VideoSDK AI Agents Framework
+# https://docs.videosdk.live/ai_agents/introduction
+videosdk-agents>=0.0.62
+
+# Gemini/Google Plugin for Realtime Voice
+videosdk-plugins-google
+
+# JWT Token Generation (for VideoSDK auth)
+PyJWT>=2.8.0
+
+# Supabase Client (for database access)
+supabase>=2.0.0
+
+# Utilities
+python-dotenv>=1.0.0
+aiohttp>=3.9.0
