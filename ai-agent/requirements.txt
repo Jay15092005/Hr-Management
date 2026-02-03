@@ -5,6 +5,12 @@ videosdk-agents>=0.0.62
 # Gemini/Google Plugin for Realtime Voice
 videosdk-plugins-google
 
+# Voice Activity Detection (VAD) - Required for detecting user speech
+videosdk-plugins-silero
+
+# Turn Detection - For detecting when user stops speaking
+videosdk-plugins-turn-detector
+
 # JWT Token Generation (for VideoSDK auth)
 PyJWT>=2.8.0
 

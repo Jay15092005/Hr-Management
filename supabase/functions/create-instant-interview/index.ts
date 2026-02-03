@@ -206,7 +206,7 @@ Deno.serve(async (req: Request) => {
         duration_minutes: duration_minutes,
         coding_round: coding_round || false,
         scheduled_at: scheduledAt,
-        status: "active", // Set to active immediately for instant interview
+        status: "scheduled", // Set to scheduled so AI agent can pick it up
       })
       .select()
       .single();

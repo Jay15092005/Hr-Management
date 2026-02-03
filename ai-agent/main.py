@@ -20,6 +20,7 @@ import os
 import sys
 import argparse
 import time
+import subprocess
 import jwt  # PyJWT for token generation
 import aiohttp
 from datetime import datetime, timedelta, timezone
@@ -485,18 +486,7 @@ async def start_session(context: JobContext):
     print(f"Coding Round: {coding_round}")
     print(f"{'='*50}\n")
 
-    # Initialize Gemini Realtime model
-    model = GeminiRealtime(
-        model="gemini-2.5-flash-native-audio-preview-12-2025",
-        api_key=gemini_api_key,
-        config=GeminiLiveConfig(
-            voice=gemini_voice,
-            response_modalities=["AUDIO"],
-        ),
-    )
-
-    pipeline = RealTimePipeline(model=model)
-
+    # Create the interviewer agent
     agent = InterviewerAgent(
         candidate_name=candidate_name,
         interview_type=interview_type,
@@ -507,7 +497,27 @@ async def start_session(context: JobContext):
         coding_round=coding_round,
     )
 
-    session = AgentSession(agent=agent, pipeline=pipeline)
+    # Initialize Gemini Realtime model - handles speech-to-speech internally
+    # Gemini's native audio model handles VAD and turn detection
+    model = GeminiRealtime(
+        model="gemini-2.5-flash-native-audio-preview-12-2025",
+        api_key=gemini_api_key,
+        config=GeminiLiveConfig(
+            voice=gemini_voice,
+            response_modalities=["AUDIO"],
+        ),
+    )
+
+    # RealTimePipeline - Gemini handles everything internally
+    pipeline = RealTimePipeline(model=model)
+
+    print("✅ Realtime Pipeline configured (Gemini Speech-to-Speech)")
+
+    # Create session - simplified setup matching working example
+    session = AgentSession(
+        agent=agent,
+        pipeline=pipeline,
+    )
 
     # Update interview status to active if we have interview data
     if interview_data and interview_data.get("id"):
@@ -523,6 +533,7 @@ async def start_session(context: JobContext):
         print("✅ Connected to VideoSDK room")
         await session.start()
         print("✅ Interview session started")
+        # Keep the session running until manually terminated
         await asyncio.Event().wait()
     except Exception as e:
         print(f"❌ Error: {e}")
@@ -565,6 +576,119 @@ def make_context() -> JobContext:
 
 
 # ============================================
+# Polling Loop for Auto-Join
+# ============================================
+def poll_and_join_interviews():
+    """
+    Continuously poll for new interviews and spawn a separate agent process
+    for each interview. This avoids event-loop issues by running one
+    VideoSDK WorkerJob per Python process.
+    """
+    import time as time_module
+
+    api_key = os.getenv("VIDEOSDK_API_KEY")
+    secret = os.getenv("VIDEOSDK_SECRET")
+
+    if not api_key or not secret:
+        print("❌ ERROR: VIDEOSDK_API_KEY and VIDEOSDK_SECRET are required")
+        return
+
+    print("\n" + "=" * 60)
+    print("🤖 AI Interview Agent - Polling Mode")
+    print("=" * 60)
+    print("Agent will automatically join interviews when created.")
+    print("Create an interview in the HR app and the agent will join!")
+    print("=" * 60 + "\n")
+
+    processed_room_ids: set[str] = set()
+
+    while True:
+        try:
+            # Connect to Supabase
+            supabase = get_supabase_client()
+
+            # Look for newest interview that needs an AI agent
+            result = (
+                supabase.from_("interview_configurations")
+                .select(
+                    """
+                    *,
+                    candidate_selections (
+                        id,
+                        resume_id,
+                        job_description_id,
+                        resumes (
+                            id,
+                            name,
+                            email,
+                            years_of_experience,
+                            location,
+                            degree
+                        ),
+                        job_descriptions (
+                            id,
+                            title,
+                            description,
+                            required_skills
+                        )
+                    )
+                    """
+                )
+                .in_("status", ["scheduled", "active"])
+                .not_.is_("room_id", "null")
+                .order("created_at", desc=True)
+                .limit(1)
+                .execute()
+            )
+
+            if result.data and len(result.data) > 0:
+                interview_data = result.data[0]
+                room_id = interview_data.get("room_id")
+
+                # Skip if we've already started an agent for this room
+                if room_id in processed_room_ids:
+                    time_module.sleep(3)
+                    continue
+
+                candidate_selection = interview_data.get("candidate_selections", {}) or {}
+                resume = candidate_selection.get("resumes", {}) or {}
+                candidate_name = resume.get("name", "Unknown")
+
+                print("\n🎯 New interview detected!")
+                print(f"   Room ID: {room_id}")
+                print(f"   Candidate: {candidate_name}")
+                print(f"   Type: {interview_data.get('interview_type')}")
+                print(f"   Difficulty: {interview_data.get('difficulty_level')}")
+
+                processed_room_ids.add(room_id)
+
+                # Spawn a separate process that runs this script in 'run' mode
+                print("\n🚀 Spawning AI agent process for this room...")
+                cmd = [
+                    sys.executable,
+                    os.path.abspath(__file__),
+                    "run",
+                    f"--room-id={room_id}",
+                ]
+                try:
+                    subprocess.Popen(cmd)
+                    print("✅ Agent process started")
+                except Exception as e:
+                    print(f"❌ Failed to start agent process: {e}")
+            else:
+                print("⏳ No scheduled interviews. Waiting for new interview...")
+
+            time_module.sleep(3)
+
+        except KeyboardInterrupt:
+            print("\n👋 Agent stopped by user")
+            break
+        except Exception as e:
+            print(f"⚠️ Error: {e}")
+            time_module.sleep(3)
+
+
+# ============================================
 # Main Entry Point
 # ============================================
 def main():
@@ -573,8 +697,8 @@ def main():
     parser = argparse.ArgumentParser(
         description="AI Interview Agent - Auto-connects to VideoSDK rooms from Supabase",
     )
-    parser.add_argument("mode", nargs="?", default="run", choices=["run", "console"])
-    parser.add_argument("--room-id", type=str, help="Override room ID")
+    parser.add_argument("mode", nargs="?", default="poll", choices=["poll", "run", "console"])
+    parser.add_argument("--room-id", type=str, help="Override room ID (for 'run' mode)")
     parser.add_argument("--interview-type", type=str, help="Override interview type")
     parser.add_argument("--difficulty", type=str, help="Override difficulty level")
     parser.add_argument("--candidate", type=str, help="Override candidate name")
@@ -589,14 +713,19 @@ def main():
         print("Add them to your .env file")
         sys.exit(1)
 
-    # Generate JWT token automatically
-    print("🔐 Generating VideoSDK JWT token...")
-    auth_token = generate_videosdk_token(api_key, secret)
-    INTERVIEW_CONTEXT["auth_token"] = auth_token
-    print("✅ Token generated successfully")
+    # Handle different modes
+    if args.mode == "poll":
+        # Default: Continuously poll and auto-join interviews
+        print("🔐 Generating VideoSDK JWT token...")
+        poll_and_join_interviews()  # Synchronous polling loop
+        return
 
-    # Handle console mode
     if args.mode == "console":
+        print("🔐 Generating VideoSDK JWT token...")
+        auth_token = generate_videosdk_token(api_key, secret)
+        INTERVIEW_CONTEXT["auth_token"] = auth_token
+        print("✅ Token generated successfully")
+        
         print("\n🎤 Console mode - testing with local mic/speaker")
         INTERVIEW_CONTEXT["room_id"] = "console-test"
         
@@ -612,6 +741,12 @@ def main():
         job = WorkerJob(entrypoint=start_session, jobctx=make_context)
         job.start()
         return
+
+    # "run" mode - one-time execution
+    print("🔐 Generating VideoSDK JWT token...")
+    auth_token = generate_videosdk_token(api_key, secret)
+    INTERVIEW_CONTEXT["auth_token"] = auth_token
+    print("✅ Token generated successfully")
 
     # Check for room ID override
     if args.room_id:
