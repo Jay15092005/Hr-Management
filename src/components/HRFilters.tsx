@@ -44,6 +44,7 @@ export default function HRFilters({
 
       if (error) throw error
       setAllResumes(data || [])
+      onFilteredResumes(data || [])
     } catch (err) {
       console.error('Error fetching resumes:', err)
     }

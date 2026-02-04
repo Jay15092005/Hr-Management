@@ -6,7 +6,6 @@ import {
   VideoPlayer,
 } from '@videosdk.live/react-sdk'
 import { supabase } from '../lib/supabase'
-import { validateVideoSDKRoom, getMeetingJoinUrl } from '../utils/videosdk'
 import './InterviewRoom.css'
 
 interface InterviewRoomProps {
@@ -40,7 +39,9 @@ const getVideoSDKToken = async (): Promise<string | null> => {
 }
 
 function Controls() {
-  const { leave, toggleMic, toggleWebcam, micEnabled, webcamEnabled } = useMeeting()
+  const { leave, toggleMic, toggleWebcam, localParticipant } = useMeeting()
+  const micEnabled = localParticipant?.micOn
+  const webcamEnabled = localParticipant?.webcamOn
 
   return (
     <div className="meeting-controls">
@@ -116,7 +117,7 @@ function ParticipantView({ participantId }: { participantId: string }) {
   )
 }
 
-function MeetingView({ roomId, candidateName, onLeave }: InterviewRoomProps) {
+function MeetingView({ roomId, onLeave }: InterviewRoomProps) {
   const [joined, setJoined] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [roomValid, setRoomValid] = useState<boolean | null>(null)
@@ -311,6 +312,7 @@ export default function InterviewRoom({ roomId, candidateName, onLeave }: Interv
         micEnabled: true,
         webcamEnabled: true,
         name: candidateName,
+        debugMode: false,
       }}
       token={token}
     >

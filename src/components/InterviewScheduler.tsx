@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { supabase, type InterviewConfiguration, type CandidateSelection } from '../lib/supabase'
+import { supabase, type CandidateSelection } from '../lib/supabase'
 import { sendSelectionEmail } from '../utils/email'
 import './InterviewScheduler.css'
 
@@ -55,7 +55,7 @@ export default function InterviewScheduler({
       }
 
       // Create interview configuration
-      const { data: interviewConfig, error: configError } = await supabase
+      const { error: configError } = await supabase
         .from('interview_configurations')
         .insert({
           candidate_selection_id: candidateSelection.id,
@@ -119,9 +119,7 @@ export default function InterviewScheduler({
     setFormData((prev) => ({ ...prev, [field]: value }))
   }
 
-  // Get minimum date/time (today)
   const today = new Date().toISOString().split('T')[0]
-  const now = new Date().toTimeString().slice(0, 5)
 
   return (
     <div className="interview-scheduler-overlay" onClick={onClose}>

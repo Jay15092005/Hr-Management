@@ -78,7 +78,7 @@ Return ONLY the JSON object starting with { and ending with }. Nothing before, n
               temperature: 0.1, // Very low temperature for consistent JSON output
               topK: 40,
               topP: 0.95,
-              maxOutputTokens: 1024,
+              maxOutputTokens: 8192,
               responseMimeType: 'application/json', // Request JSON response format
             },
           }),
@@ -88,28 +88,27 @@ Return ONLY the JSON object starting with { and ending with }. Nothing before, n
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
         const errorMessage = errorData.error?.message || `Gemini API error: ${response.statusText}`
-        
+
         // Provide helpful error message for deprecated models
         if (errorMessage.includes('not found') || errorMessage.includes('not supported')) {
           throw new Error(
             `Model error: ${errorMessage}. Please check that you're using a valid model name (e.g., gemini-2.5-flash or gemini-2.5-pro).`
           )
         }
-        
+
         // Handle quota exceeded errors
         if (errorMessage.includes('quota') || errorMessage.includes('Quota exceeded')) {
           const retryAfterMatch = errorMessage.match(/Please retry in ([\d.]+)s/)
           const retryAfter = retryAfterMatch ? parseFloat(retryAfterMatch[1]) : null
-          
+
           throw new Error(
-            `Quota exceeded: You've reached your free tier limit. ${
-              retryAfter 
-                ? `Please wait ${Math.ceil(retryAfter)} seconds before retrying. ` 
-                : ''
+            `Quota exceeded: You've reached your free tier limit. ${retryAfter
+              ? `Please wait ${Math.ceil(retryAfter)} seconds before retrying. `
+              : ''
             }Consider switching to gemini-2.5-flash model (set VITE_GEMINI_MODEL=gemini-2.5-flash) which has better free tier limits.`
           )
         }
-        
+
         // Handle model overloaded errors with automatic retry
         if (
           errorMessage.includes('overloaded') ||
@@ -123,9 +122,9 @@ Return ONLY the JSON object starting with { and ending with }. Nothing before, n
             console.log(
               `Model overloaded. Retrying in ${delaySeconds / 1000} seconds... (Attempt ${retryCount + 1}/${maxRetries})`
             )
-            
+
             await new Promise((resolve) => setTimeout(resolve, delaySeconds))
-            
+
             // Retry the request
             return this.evaluateResume(resumeText, jobDescription, retryCount + 1, maxRetries)
           } else {
@@ -134,7 +133,7 @@ Return ONLY the JSON object starting with { and ending with }. Nothing before, n
             )
           }
         }
-        
+
         throw new Error(errorMessage)
       }
 
@@ -148,40 +147,40 @@ Return ONLY the JSON object starting with { and ending with }. Nothing before, n
 
       // Extract JSON from response (handle markdown code blocks and various formats)
       let jsonText = responseText
-      
+
       // Step 1: Remove markdown code blocks if present
       jsonText = jsonText.replace(/^```(?:json)?\s*/i, '') // Remove opening ```
       jsonText = jsonText.replace(/\s*```$/i, '') // Remove closing ```
       jsonText = jsonText.trim()
-      
+
       // Step 2: Fix double curly braces (common Gemini issue: {{ instead of {)
       // Handle cases like: {{ "score": ... }} or { { "score": ... } }
       jsonText = jsonText.replace(/^\{\s*\{/, '{') // Replace {{ with {
       jsonText = jsonText.replace(/\}\s*\}\s*$/, '}') // Replace }} with }
-      
+
       // Step 3: Find the JSON object (handle extra text before/after)
       const jsonObjectMatch = jsonText.match(/\{[\s\S]*\}/)
       if (jsonObjectMatch) {
         jsonText = jsonObjectMatch[0]
       }
-      
+
       // Step 4: Clean up any remaining artifacts
       jsonText = jsonText.replace(/^`+|`+$/g, '') // Remove backticks
       jsonText = jsonText.replace(/^\s+|\s+$/g, '') // Remove whitespace
-      
+
       // Step 5: Fix any remaining double braces or formatting issues
       // Remove any leading text before first {
       const firstBraceIndex = jsonText.indexOf('{')
       if (firstBraceIndex > 0) {
         jsonText = jsonText.substring(firstBraceIndex)
       }
-      
+
       // Remove any trailing text after last }
       const lastBraceIndex = jsonText.lastIndexOf('}')
       if (lastBraceIndex >= 0 && lastBraceIndex < jsonText.length - 1) {
         jsonText = jsonText.substring(0, lastBraceIndex + 1)
       }
-      
+
       // Final cleanup: ensure single braces
       jsonText = jsonText.replace(/^\{\s*\{/, '{')
       jsonText = jsonText.replace(/\}\s*\}\s*$/, '}')
@@ -201,14 +200,14 @@ Return ONLY the JSON object starting with { and ending with }. Nothing before, n
         console.error('JSON Parse Error:', parseError)
         console.error('Attempted to parse:', jsonText.substring(0, 500))
         console.error('Full original response:', responseText)
-        
+
         // Last resort: try to extract just the JSON part more aggressively
         try {
           // Find the innermost complete JSON object
           let braceCount = 0
           let startIndex = -1
           let endIndex = -1
-          
+
           for (let i = 0; i < responseText.length; i++) {
             if (responseText[i] === '{') {
               if (startIndex === -1) startIndex = i
@@ -221,7 +220,7 @@ Return ONLY the JSON object starting with { and ending with }. Nothing before, n
               }
             }
           }
-          
+
           if (startIndex !== -1 && endIndex !== -1) {
             jsonText = responseText.substring(startIndex, endIndex + 1)
             result = JSON.parse(jsonText)
