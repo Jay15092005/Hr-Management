@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { supabase, type CandidateWithScore, type JobDescription, type InterviewConfiguration } from '../lib/supabase'
-import { sendSelectionEmail } from '../utils/email'
 import InterviewScheduler from './InterviewScheduler'
 import './HRReview.css'
 
@@ -325,17 +324,17 @@ export default function HRReview({ jobDescription, compact = false }: HRReviewPr
       if (data?.success) {
         // Refresh candidates list
         await fetchCandidatesWithScores()
-        
+
         // Show success message and optionally open interview room
         const joinUrl = data.join_url
         const shouldOpen = confirm(
           `Instant interview created successfully!\n\nInterview link sent to ${instantInterviewCandidate.email}\n\nWould you like to open the interview room now?`
         )
-        
+
         if (shouldOpen && joinUrl) {
           window.open(joinUrl, '_blank')
         }
-        
+
         handleInstantInterviewClose()
       } else {
         throw new Error('Failed to create instant interview')

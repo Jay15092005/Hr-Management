@@ -91,9 +91,9 @@ export default function CandidatesTable({ resumes, jobDescription }: CandidatesT
       }
 
       const scoresByResume = new Map<string, ResumeScore>()
-      ;(scoresData || []).forEach((s: ResumeScore) => scoresByResume.set(s.resume_id, s))
+        ; (scoresData || []).forEach((s: ResumeScore) => scoresByResume.set(s.resume_id, s))
       const selectionsByResume = new Map<string, CandidateSelection>()
-      ;(selectionsData || []).forEach((s: CandidateSelection) => selectionsByResume.set(s.resume_id, s))
+        ; (selectionsData || []).forEach((s: CandidateSelection) => selectionsByResume.set(s.resume_id, s))
       const interviewsBySel = new Map<string, InterviewConfiguration>()
       interviewsData.forEach((i) => interviewsBySel.set(i.candidate_selection_id, i))
 
@@ -145,7 +145,7 @@ export default function CandidatesTable({ resumes, jobDescription }: CandidatesT
         if (resume.resume_file_url?.endsWith('.txt')) {
           resumeText = await extractResumeTextFromUrl(resume.resume_file_url)
         }
-      } catch (_) {}
+      } catch (_) { }
 
       const gemini = getGeminiService()
       const evaluation = await gemini.evaluateResume(
@@ -452,10 +452,9 @@ export default function CandidatesTable({ resumes, jobDescription }: CandidatesT
             {rows.map((row) => {
               const score = row.score
               const isEval = evaluating === row.resume.id
-              const isProc = processing === row.resume.id
-              const menuOpen = menuOpenId === row.resume.id
+              const isRejected = row.selection?.status === 'rejected'
               return (
-                <tr key={row.resume.id}>
+                <tr key={row.resume.id} className={isRejected ? 'candidates-table-row-rejected' : ''}>
                   <td className="td-name">{row.resume.name}</td>
                   <td>
                     <a
@@ -618,6 +617,7 @@ export default function CandidatesTable({ resumes, jobDescription }: CandidatesT
           return createPortal(
             <div
               className="dropdown-menu dropdown-menu-portal"
+              onClick={(e) => e.stopPropagation()}
               style={{
                 position: 'fixed',
                 top: menuAnchorRect.bottom + 4,
@@ -683,7 +683,7 @@ export default function CandidatesTable({ resumes, jobDescription }: CandidatesT
                   </div>
                 )}
               </div>
-              {(!row.selection || row.selection.status !== 'rejected') && (
+              {(!row.selection || row.selection.status !== 'rejected') ? (
                 <button
                   type="button"
                   className="dropdown-item danger"
@@ -692,6 +692,10 @@ export default function CandidatesTable({ resumes, jobDescription }: CandidatesT
                 >
                   ✗ Reject
                 </button>
+              ) : (
+                <span className="dropdown-item dropdown-item-label danger">
+                  ✗ Rejected
+                </span>
               )}
               <button
                 type="button"

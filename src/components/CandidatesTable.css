@@ -117,6 +117,23 @@
   background: #fafafa;
 }
 
+.candidates-table tbody tr.candidates-table-row-rejected {
+  background: #f0f0f0;
+  color: #888;
+}
+
+.candidates-table tbody tr.candidates-table-row-rejected:hover {
+  background: #e8e8e8;
+}
+
+.candidates-table tbody tr.candidates-table-row-rejected .td-name {
+  color: #888;
+}
+
+.candidates-table tbody tr.candidates-table-row-rejected .link-resume {
+  color: #78909c;
+}
+
 .candidates-table td {
   padding: 0.6rem 0.75rem;
   vertical-align: middle;
