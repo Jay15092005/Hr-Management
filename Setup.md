@@ -148,6 +148,9 @@ npm run preview
 supabase functions deploy send-selection-email --project-ref fvsywwknwfeyvxvjlmmd
 supabase functions deploy send-interview-link-email --project-ref fvsywwknwfeyvxvjlmmd
 supabase functions deploy create-interview-room --project-ref fvsywwknwfeyvxvjlmmd
+supabase functions deploy create-instant-interview --project-ref fvsywwknwfeyvxvjlmmd
+supabase functions deploy confirm-interview-slot --project-ref fvsywwknwfeyvxvjlmmd
+supabase functions deploy schedule-interview --project-ref fvsywwknwfeyvxvjlmmd
 ```
 
 ### Set Edge Function Secrets
@@ -158,6 +161,7 @@ In Supabase Dashboard → Edge Functions → Settings, add these secrets:
 - `RESEND_API_KEY` - Your Resend API key
 - `SUPABASE_URL` - Your Supabase project URL
 - `SUPABASE_SERVICE_ROLE_KEY` - Your Supabase service role key
+- `CONFIRM_INTERVIEW_SECRET` - A random secret (e.g. 32+ chars) used to sign "pick a time" and "schedule your slot" links; set the same value for `send-selection-email`, `confirm-interview-slot`, and `schedule-interview`
 
 ---
 

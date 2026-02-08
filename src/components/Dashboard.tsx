@@ -5,9 +5,10 @@ import UploadResume from './UploadResume'
 import ResumeList from './ResumeList'
 import HRWorkflow from './HRWorkflow'
 import JobDescriptionManager from './JobDescription'
+import MeetingOverview from './MeetingOverview'
 import './Dashboard.css'
 
-type Section = 'upload' | 'list' | 'description' | 'workflow'
+type Section = 'upload' | 'list' | 'description' | 'workflow' | 'meetings'
 
 function getDateDisplay() {
   const d = new Date()
@@ -27,8 +28,9 @@ export default function Dashboard() {
   const location = useLocation()
 
   useEffect(() => {
-    if (location.state?.section === 'workflow') {
-      setActiveSection('workflow')
+    const s = location.state?.section
+    if (s === 'workflow' || s === 'meetings') {
+      setActiveSection(s)
     }
   }, [location.state?.section])
 
@@ -69,6 +71,13 @@ export default function Dashboard() {
             <span className="nav-icon">📄</span>
             Workflow
           </button>
+          <button
+            className={`nav-btn ${activeSection === 'meetings' ? 'active' : ''}`}
+            onClick={() => setActiveSection('meetings')}
+          >
+            <span className="nav-icon">📋</span>
+            Meeting Details
+          </button>
         </nav>
       </header>
 
@@ -99,6 +108,12 @@ export default function Dashboard() {
               filteredResumes={workflowContext.filteredResumes}
               setFilteredResumes={workflowContext.setFilteredResumes}
             />
+          </div>
+        )}
+
+        {activeSection === 'meetings' && (
+          <div className="dashboard-section">
+            <MeetingOverview />
           </div>
         )}
       </div>

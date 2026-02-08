@@ -1,0 +1,53 @@
+.confirm-interview-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: linear-gradient(135deg, #f0f4ff 0%, #e8eeff 100%);
+}
+
+.confirm-interview-card {
+  max-width: 420px;
+  width: 100%;
+  padding: 2rem;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  text-align: center;
+}
+
+.confirm-interview-loading {
+  color: #64748b;
+  margin: 0;
+}
+
+.confirm-interview-title {
+  font-size: 1.5rem;
+  margin: 0 0 0.75rem 0;
+  color: #0f172a;
+}
+
+.confirm-interview-title.error {
+  color: #b91c1c;
+}
+
+.confirm-interview-message {
+  color: #475569;
+  margin: 0 0 0.5rem 0;
+  line-height: 1.5;
+}
+
+.confirm-interview-time {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #2563eb;
+  margin: 0.75rem 0;
+}
+
+.confirm-interview-note {
+  font-size: 0.875rem;
+  color: #64748b;
+  margin: 1rem 0 0 0;
+  line-height: 1.5;
+}

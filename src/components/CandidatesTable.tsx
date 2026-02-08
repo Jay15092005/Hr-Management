@@ -37,7 +37,6 @@ export default function CandidatesTable({ resumes, jobDescription }: CandidatesT
   const [menuAnchorRect, setMenuAnchorRect] = useState<DOMRect | null>(null)
   const [detailsHoverId, setDetailsHoverId] = useState<string | null>(null)
   const [detailsAnchorRect, setDetailsAnchorRect] = useState<DOMRect | null>(null)
-  const [submenuHover, setSubmenuHover] = useState(false)
   const detailsLeaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
@@ -129,7 +128,7 @@ export default function CandidatesTable({ resumes, jobDescription }: CandidatesT
         .select('*')
         .eq('resume_id', resume.id)
         .eq('job_description_id', jobDescription.id)
-        .single()
+        .maybeSingle()
       if (existing) {
         setRows((prev) =>
           prev.map((r) =>
@@ -140,12 +139,14 @@ export default function CandidatesTable({ resumes, jobDescription }: CandidatesT
         return
       }
 
-      let resumeText = `Candidate Name: ${resume.name}\nEmail: ${resume.email}\nExperience: ${resume.years_of_experience || 0} years\nLocation: ${resume.location || 'Not specified'}\nDegree: ${resume.degree || 'Not specified'}\n\nResume text extraction from PDF/DOCX files requires additional libraries.`
+      // Extract text from resume (PDF, DOCX, TXT)
+      let resumeText = ''
       try {
-        if (resume.resume_file_url?.endsWith('.txt')) {
-          resumeText = await extractResumeTextFromUrl(resume.resume_file_url)
-        }
-      } catch (_) {}
+        resumeText = await extractResumeTextFromUrl(resume.resume_file_url)
+      } catch {
+        // Fallback to basic candidate info if extraction fails
+        resumeText = `Candidate Name: ${resume.name}\nEmail: ${resume.email}\nExperience: ${resume.years_of_experience || 0} years\nLocation: ${resume.location || 'Not specified'}\nDegree: ${resume.degree || 'Not specified'}`
+      }
 
       const gemini = getGeminiService()
       const evaluation = await gemini.evaluateResume(
@@ -161,6 +162,8 @@ export default function CandidatesTable({ resumes, jobDescription }: CandidatesT
             job_description_id: jobDescription.id,
             score: evaluation.score,
             missing_skills: evaluation.missing_skills,
+            must_have_matched_skills: evaluation.must_have_matched_skills,
+            nice_to_have_matched_skills: evaluation.nice_to_have_matched_skills,
             summary: evaluation.summary,
             resume_text: resumeText,
           },
@@ -256,7 +259,6 @@ export default function CandidatesTable({ resumes, jobDescription }: CandidatesT
     } finally {
       setProcessing(null)
       setMenuOpenId(null)
-      setSubmenuHover(false)
     }
   }
 
@@ -274,13 +276,13 @@ export default function CandidatesTable({ resumes, jobDescription }: CandidatesT
         },
         { onConflict: 'resume_id,job_description_id' }
       )
-      await fetchData()
+      // Navigate to detail page after selecting
+      navigate(`/candidate/${jobDescription.id}/${row.resume.id}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed')
     } finally {
       setProcessing(null)
       setMenuOpenId(null)
-      setSubmenuHover(false)
     }
   }
 
@@ -306,7 +308,6 @@ export default function CandidatesTable({ resumes, jobDescription }: CandidatesT
     } finally {
       setProcessing(null)
       setMenuOpenId(null)
-      setSubmenuHover(false)
     }
   }
 
@@ -314,7 +315,6 @@ export default function CandidatesTable({ resumes, jobDescription }: CandidatesT
     if (!row.selection) return
     setSchedulingRow(row)
     setMenuOpenId(null)
-    setSubmenuHover(false)
   }
 
   const handleInstantInterview = (row: RowData) => {
@@ -328,7 +328,6 @@ export default function CandidatesTable({ resumes, jobDescription }: CandidatesT
       coding_round: false,
     })
     setMenuOpenId(null)
-    setSubmenuHover(false)
   }
 
   const handleInstantSubmit = async (e: React.FormEvent) => {
@@ -372,7 +371,6 @@ export default function CandidatesTable({ resumes, jobDescription }: CandidatesT
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setMenuOpenId(null)
         setMenuAnchorRect(null)
-        setSubmenuHover(false)
       }
     }
     document.addEventListener('click', close)
@@ -588,6 +586,26 @@ export default function CandidatesTable({ resumes, jobDescription }: CandidatesT
                   <strong>Summary:</strong> {score.summary}
                 </p>
               )}
+              {(score.must_have_matched_skills?.length ?? 0) > 0 && (
+                <div className="details-matched must-have">
+                  <strong>Must-have matched:</strong>
+                  <ul>
+                    {(score.must_have_matched_skills ?? []).map((s, i) => (
+                      <li key={i}>{s}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {(score.nice_to_have_matched_skills?.length ?? 0) > 0 && (
+                <div className="details-matched nice-to-have">
+                  <strong>Nice-to-have matched:</strong>
+                  <ul>
+                    {(score.nice_to_have_matched_skills ?? []).map((s, i) => (
+                      <li key={i}>{s}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               {score.missing_skills?.length > 0 && (
                 <div className="details-missing">
                   <strong>Missing skills:</strong>
@@ -598,9 +616,12 @@ export default function CandidatesTable({ resumes, jobDescription }: CandidatesT
                   </ul>
                 </div>
               )}
-              {!score.summary && !score.missing_skills?.length && (
-                <p className="details-empty">No extra details.</p>
-              )}
+              {!score.summary &&
+                !(score.must_have_matched_skills?.length ?? 0) &&
+                !(score.nice_to_have_matched_skills?.length ?? 0) &&
+                !score.missing_skills?.length && (
+                  <p className="details-empty">No extra details.</p>
+                )}
             </div>,
             document.body
           )
@@ -613,8 +634,6 @@ export default function CandidatesTable({ resumes, jobDescription }: CandidatesT
           const row = rows.find((r) => r.resume.id === menuOpenId)
           if (!row) return null
           const isProc = processing === row.resume.id
-          const isSelected = row.selection?.status === 'selected'
-          const showInstantSchedule = isSelected && !row.interview
           return createPortal(
             <div
               className="dropdown-menu dropdown-menu-portal"
@@ -627,72 +646,17 @@ export default function CandidatesTable({ resumes, jobDescription }: CandidatesT
                 ),
               }}
             >
-              <div
-                className="dropdown-item-with-submenu"
-                onMouseEnter={() => setSubmenuHover(true)}
-                onMouseLeave={() => setSubmenuHover(false)}
+              <button
+                type="button"
+                className="dropdown-item"
+                onClick={() => {
+                  navigate(`/candidate/${jobDescription.id}/${row.resume.id}`)
+                  setMenuOpenId(null)
+                  setMenuAnchorRect(null)
+                }}
               >
-                {!isSelected ? (
-                  <button
-                    type="button"
-                    className="dropdown-item dropdown-item-trigger"
-                    onClick={() => handleSelect(row)}
-                    disabled={isProc}
-                  >
-                    ✓ Select
-                  </button>
-                ) : (
-                  <span className="dropdown-item dropdown-item-label">
-                    ✓ Selected
-                  </span>
-                )}
-                {submenuHover && (
-                  <div className="dropdown-submenu">
-                    {showInstantSchedule && (
-                      <>
-                        <button
-                          type="button"
-                          className="dropdown-item"
-                          onClick={() => handleInstantInterview(row)}
-                        >
-                          ⚡ Instant Interview
-                        </button>
-                        <button
-                          type="button"
-                          className="dropdown-item"
-                          onClick={() => handleScheduleInterview(row)}
-                        >
-                          📅 Schedule Interview
-                        </button>
-                      </>
-                    )}
-                    <button
-                      type="button"
-                      className="dropdown-item"
-                      onClick={() => {
-                        navigate(
-                          `/candidate/${jobDescription.id}/${row.resume.id}`
-                        )
-                        setMenuOpenId(null)
-                        setMenuAnchorRect(null)
-                        setSubmenuHover(false)
-                      }}
-                    >
-                      More Detail
-                    </button>
-                  </div>
-                )}
-              </div>
-              {(!row.selection || row.selection.status !== 'rejected') && (
-                <button
-                  type="button"
-                  className="dropdown-item danger"
-                  onClick={() => handleReject(row)}
-                  disabled={isProc}
-                >
-                  ✗ Reject
-                </button>
-              )}
+                More Detail
+              </button>
               <button
                 type="button"
                 className="dropdown-item"

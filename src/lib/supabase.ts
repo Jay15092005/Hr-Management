@@ -45,6 +45,8 @@ export interface ResumeScore {
   job_description_id: string
   score: number
   missing_skills: string[]
+  must_have_matched_skills?: string[]
+  nice_to_have_matched_skills?: string[]
   summary: string | null
   resume_text: string | null
   evaluated_at: string

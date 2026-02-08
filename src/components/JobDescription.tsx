@@ -4,11 +4,14 @@ import './JobDescription.css'
 
 interface JobDescriptionProps {
   onJobDescriptionSelect: (jobDescription: JobDescription | null) => void
+  /** When provided (e.g. in workflow), APPLY will call this so parent can load all resumes */
+  onApply?: (job: JobDescription) => void
   compact?: boolean
 }
 
 export default function JobDescriptionManager({
   onJobDescriptionSelect,
+  onApply,
   compact = false,
 }: JobDescriptionProps) {
   const [jobDescriptions, setJobDescriptions] = useState<JobDescription[]>([])
@@ -132,7 +135,9 @@ export default function JobDescriptionManager({
   }
 
   const handleApply = () => {
-    if (selectedJob) onJobDescriptionSelect(selectedJob)
+    if (!selectedJob) return
+    onJobDescriptionSelect(selectedJob)
+    onApply?.(selectedJob)
   }
 
   if (compact) {

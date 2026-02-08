@@ -1,0 +1,337 @@
+/* ── Meeting Overview ── */
+.mo-container {
+  width: 100%;
+  max-width: 100%;
+}
+
+.mo-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #222;
+  margin: 0 0 1rem 0;
+}
+
+/* ── Loading / Error ── */
+.mo-loading,
+.mo-empty {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: #888;
+  font-size: 0.95rem;
+}
+.mo-error {
+  text-align: center;
+  padding: 1.5rem;
+  color: #c62828;
+  background: #ffebee;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+}
+
+/* ── Stats row ── */
+.mo-stats-row {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+.mo-stat {
+  flex: 1;
+  min-width: 100px;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.mo-stat:hover {
+  border-color: #1976d2;
+  box-shadow: 0 1px 4px rgba(25, 118, 210, 0.15);
+}
+.mo-stat-num {
+  display: block;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1976d2;
+}
+.mo-stat-label {
+  font-size: 0.75rem;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* ── Toolbar ── */
+.mo-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+.mo-search {
+  flex: 1;
+  min-width: 180px;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.mo-search:focus {
+  border-color: #1976d2;
+}
+.mo-filters {
+  display: flex;
+  gap: 0.25rem;
+}
+.mo-filter-btn {
+  padding: 0.4rem 0.7rem;
+  border: 1px solid #ddd;
+  background: white;
+  border-radius: 4px;
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: all 0.15s;
+  color: #555;
+}
+.mo-filter-btn:hover {
+  border-color: #1976d2;
+  color: #1976d2;
+}
+.mo-filter-btn.active {
+  background: #1976d2;
+  color: white;
+  border-color: #1976d2;
+}
+
+/* ── Buttons ── */
+.mo-btn {
+  padding: 0.45rem 0.85rem;
+  border: 1px solid #ddd;
+  background: white;
+  border-radius: 5px;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.mo-btn:hover {
+  background: #f5f5f5;
+  border-color: #bbb;
+}
+.mo-refresh-btn {
+  margin-left: auto;
+}
+.mo-btn-sm {
+  padding: 0.25rem 0.55rem;
+  font-size: 0.75rem;
+}
+.mo-btn-primary {
+  background: #1976d2;
+  color: white;
+  border-color: #1976d2;
+}
+.mo-btn-primary:hover {
+  background: #1565c0;
+}
+
+/* ── Table ── */
+.mo-table-wrap {
+  overflow-x: auto;
+  border: 1px solid #d0d0d0;
+  border-radius: 6px;
+  background: white;
+}
+.mo-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+.mo-th {
+  position: sticky;
+  top: 0;
+  background: #f5f6f8;
+  padding: 0.6rem 0.75rem;
+  text-align: left;
+  font-weight: 600;
+  color: #444;
+  border-bottom: 2px solid #d0d0d0;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  user-select: none;
+}
+.mo-th-num {
+  width: 36px;
+  text-align: center;
+}
+.mo-th-sortable {
+  cursor: pointer;
+}
+.mo-th-sortable:hover {
+  color: #1976d2;
+}
+
+.mo-tr {
+  border-bottom: 1px solid #eee;
+  transition: background 0.1s;
+}
+.mo-tr:hover {
+  background: #f8f9ff;
+}
+.mo-tr.expanded {
+  background: #f0f4ff;
+}
+
+.mo-td {
+  padding: 0.5rem 0.75rem;
+  color: #333;
+  vertical-align: middle;
+}
+.mo-td-num {
+  text-align: center;
+  color: #999;
+  font-size: 0.75rem;
+}
+.mo-td-center {
+  text-align: center;
+}
+.mo-td-score {
+  text-align: center;
+}
+.mo-td-actions {
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+/* ── Candidate cell ── */
+.mo-candidate-name {
+  font-weight: 600;
+  color: #222;
+}
+.mo-candidate-email {
+  font-size: 0.72rem;
+  color: #888;
+}
+
+/* ── Score badge ── */
+.mo-score {
+  display: inline-block;
+  min-width: 32px;
+  padding: 0.15rem 0.5rem;
+  border-radius: 12px;
+  font-weight: 700;
+  text-align: center;
+  font-size: 0.8rem;
+}
+.mo-score.high {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+.mo-score.mid {
+  background: #fff3e0;
+  color: #e65100;
+}
+.mo-score.low {
+  background: #ffebee;
+  color: #c62828;
+}
+
+/* ── Status badges ── */
+.mo-badge {
+  display: inline-block;
+  padding: 0.2rem 0.55rem;
+  border-radius: 10px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+.badge-selected {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+.badge-rejected {
+  background: #ffebee;
+  color: #c62828;
+}
+.badge-pending {
+  background: #fff3e0;
+  color: #e65100;
+}
+.badge-none {
+  background: #f5f5f5;
+  color: #999;
+}
+.badge-scheduled {
+  background: #e3f2fd;
+  color: #1565c0;
+}
+.badge-link-sent {
+  background: #f3e5f5;
+  color: #7b1fa2;
+}
+.badge-active {
+  background: #fff3e0;
+  color: #e65100;
+}
+.badge-completed {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+/* ── Yes / No ── */
+.mo-yes {
+  color: #2e7d32;
+  font-weight: 600;
+  font-size: 0.8rem;
+}
+.mo-no {
+  color: #999;
+  font-size: 0.8rem;
+}
+.mo-sub-date {
+  font-size: 0.68rem;
+  color: #999;
+  margin-top: 2px;
+}
+
+/* ── Footer ── */
+.mo-footer {
+  text-align: right;
+  font-size: 0.75rem;
+  color: #999;
+  padding: 0.5rem 0;
+}
+
+/* ── Responsive ── */
+@media (max-width: 900px) {
+  .mo-detail-grid {
+    grid-template-columns: 1fr;
+  }
+  .mo-stats-row {
+    gap: 0.5rem;
+  }
+  .mo-stat {
+    min-width: 70px;
+    padding: 0.5rem;
+  }
+  .mo-stat-num {
+    font-size: 1.2rem;
+  }
+}
+
+@media (max-width: 600px) {
+  .mo-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .mo-filters {
+    flex-wrap: wrap;
+  }
+}

@@ -80,7 +80,7 @@ export default function InterviewScheduler({
       if (updateError) throw updateError
 
       // Send Email 1 (Selection Confirmation with interview details)
-      const emailSent = await sendSelectionEmail({
+      const emailResult = await sendSelectionEmail({
         to: candidateEmail,
         candidateName,
         jobTitle,
@@ -100,9 +100,9 @@ export default function InterviewScheduler({
         codingRound: formData.coding_round,
       })
 
-      if (!emailSent) {
-        console.warn('Interview scheduled but email failed to send')
-        setError('Interview scheduled successfully, but email failed to send. Please check email configuration.')
+      if (!emailResult.ok) {
+        console.warn('Interview scheduled but email failed to send:', emailResult.error)
+        setError(`Interview scheduled successfully, but email failed: ${emailResult.error || 'Check email configuration.'}`)
       }
 
       onSuccess()

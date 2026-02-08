@@ -1,4 +1,4 @@
-import { type Resume, type JobDescription } from '../lib/supabase'
+import { supabase, type Resume, type JobDescription } from '../lib/supabase'
 import HRFilters from './HRFilters'
 import JobDescriptionManager from './JobDescription'
 import CandidatesTable from './CandidatesTable'
@@ -29,6 +29,20 @@ export default function HRWorkflow({
     setSelectedJobDescription(job)
   }
 
+  const handleApplyWithAllResumes = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('resumes')
+        .select('*')
+        .order('date_of_application', { ascending: false })
+      if (error) throw error
+      setFilteredResumes(data ?? [])
+    } catch (err) {
+      console.error('Error fetching all resumes:', err)
+      setFilteredResumes([])
+    }
+  }
+
   return (
     <div className="hr-workflow-container simple-layout">
       <section className="workflow-section-block">
@@ -43,6 +57,7 @@ export default function HRWorkflow({
       <section className="workflow-section-block">
         <JobDescriptionManager
           onJobDescriptionSelect={handleJobDescriptionSelect}
+          onApply={handleApplyWithAllResumes}
           compact
         />
       </section>

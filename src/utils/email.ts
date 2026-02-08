@@ -5,6 +5,11 @@
 
 import { supabase } from '../lib/supabase'
 
+export interface TimeSlotOption {
+  at: string   // ISO datetime
+  label: string
+}
+
 export interface EmailData {
   to: string
   candidateName: string
@@ -16,45 +21,65 @@ export interface EmailData {
   interviewType?: string
   difficultyLevel?: string
   codingRound?: boolean
+  /** When set, selection email can include "Pick your interview time" links */
+  candidateSelectionId?: string
+  timeSlots?: TimeSlotOption[]
+  confirmBaseUrl?: string
+}
+
+export interface SendSelectionEmailResult {
+  ok: boolean
+  error?: string
+  messageId?: string
 }
 
 /**
  * Send selection confirmation email (Email 1) - No join link
  */
-export async function sendSelectionEmail(data: EmailData): Promise<boolean> {
+export async function sendSelectionEmail(data: EmailData): Promise<SendSelectionEmailResult> {
+  const payload = {
+    to: data.to,
+    candidateName: data.candidateName,
+    jobTitle: data.jobTitle,
+    companyName: data.companyName,
+    emailType: 'selection' as const,
+    interviewDate: data.interviewDate,
+    interviewTime: data.interviewTime,
+    interviewDuration: data.interviewDuration,
+    interviewType: data.interviewType,
+    difficultyLevel: data.difficultyLevel,
+    codingRound: data.codingRound,
+    candidateSelectionId: data.candidateSelectionId,
+    timeSlots: data.timeSlots,
+    confirmBaseUrl: data.confirmBaseUrl,
+  }
+  console.log('[Email] Sending selection email:', {
+    to: data.to,
+    jobTitle: data.jobTitle,
+    hasSelectionId: !!data.candidateSelectionId,
+    timeSlotsCount: data.timeSlots?.length ?? 0,
+    confirmBaseUrl: data.confirmBaseUrl || '(none)',
+  })
   try {
-    // Call Supabase Edge Function
     const { data: result, error } = await supabase.functions.invoke('send-selection-email', {
-      body: {
-        to: data.to,
-        candidateName: data.candidateName,
-        jobTitle: data.jobTitle,
-        companyName: data.companyName,
-        emailType: 'selection',
-        interviewDate: data.interviewDate,
-        interviewTime: data.interviewTime,
-        interviewDuration: data.interviewDuration,
-        interviewType: data.interviewType,
-        difficultyLevel: data.difficultyLevel,
-        codingRound: data.codingRound,
-      },
+      body: payload,
     })
-
     if (error) {
-      console.error('Error calling edge function:', error)
-      throw error
+      console.error('[Email] Edge function error:', error)
+      return { ok: false, error: error.message || String(error) }
     }
-
+    console.log('[Email] Edge function response:', result)
     if (result?.success) {
-      console.log('Selection email sent successfully:', result.messageId)
-      return true
-    } else {
-      console.error('Email sending failed:', result?.error)
-      return false
+      console.log('[Email] Selection email sent successfully, messageId:', result.messageId)
+      return { ok: true, messageId: result.messageId }
     }
+    const errMsg = result?.error || 'Unknown error from send-selection-email'
+    console.error('[Email] Send failed:', errMsg, result?.details)
+    return { ok: false, error: errMsg }
   } catch (error) {
-    console.error('Error sending email:', error)
-    return false
+    const errMsg = error instanceof Error ? error.message : String(error)
+    console.error('[Email] Exception sending email:', error)
+    return { ok: false, error: errMsg }
   }
 }
 

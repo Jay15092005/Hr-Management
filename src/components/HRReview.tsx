@@ -100,6 +100,8 @@ export default function HRReview({ jobDescription, compact = false }: HRReviewPr
             job_description_id: score.job_description_id,
             score: score.score,
             missing_skills: score.missing_skills || [],
+            must_have_matched_skills: score.must_have_matched_skills ?? [],
+            nice_to_have_matched_skills: score.nice_to_have_matched_skills ?? [],
             summary: score.summary,
             resume_text: score.resume_text,
             evaluated_at: score.evaluated_at,

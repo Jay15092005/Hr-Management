@@ -5,6 +5,8 @@
 export interface GeminiEvaluationResult {
   score: number
   missing_skills: string[]
+  must_have_matched_skills: string[]
+  nice_to_have_matched_skills: string[]
   summary: string
 }
 
@@ -40,7 +42,7 @@ class GeminiService {
     maxRetries = 3
   ): Promise<GeminiEvaluationResult> {
     const prompt = `Role: You are an expert Technical HR Recruiter.
-Task: Evaluate this resume against the Job Description.
+Task: Evaluate this resume against the Job Description. Identify skills that are required (must-have) vs preferred (nice-to-have) in the job description, then report which required and preferred skills the candidate has.
 
 Job Description: ${jobDescription}
 Resume Text: ${resumeText}
@@ -51,10 +53,16 @@ Required JSON format (return this exact structure):
 {
   "score": <integer between 0 and 100>,
   "missing_skills": ["skill1", "skill2"],
+  "must_have_matched_skills": ["skill1", "skill2"],
+  "nice_to_have_matched_skills": ["skill1", "skill2"],
   "summary": "<one sentence summary>"
 }
 
-Return ONLY the JSON object starting with { and ending with }. Nothing before, nothing after.`
+- missing_skills: skills from the job description (must-have or important) that the resume does NOT clearly show.
+- must_have_matched_skills: required/must-have skills from the job description that the resume DOES show.
+- nice_to_have_matched_skills: preferred/nice-to-have skills from the job description that the resume DOES show.
+
+Keep each array to at most 8 items so the response is complete. Return ONLY the JSON object starting with { and ending with }. Nothing before, nothing after.`
 
     try {
       const response = await fetch(
@@ -75,11 +83,11 @@ Return ONLY the JSON object starting with { and ending with }. Nothing before, n
               },
             ],
             generationConfig: {
-              temperature: 0.1, // Very low temperature for consistent JSON output
+              temperature: 0.1,
               topK: 40,
               topP: 0.95,
-              maxOutputTokens: 1024,
-              responseMimeType: 'application/json', // Request JSON response format
+              maxOutputTokens: 4096,
+              responseMimeType: 'application/json',
             },
           }),
         }
@@ -146,53 +154,45 @@ Return ONLY the JSON object starting with { and ending with }. Nothing before, n
 
       const responseText = data.candidates[0].content.parts[0].text.trim()
 
-      // Extract JSON from response (handle markdown code blocks and various formats)
+      // Extract JSON using brace matching (handles } inside summary and trailing text)
       let jsonText = responseText
-      
-      // Step 1: Remove markdown code blocks if present
-      jsonText = jsonText.replace(/^```(?:json)?\s*/i, '') // Remove opening ```
-      jsonText = jsonText.replace(/\s*```$/i, '') // Remove closing ```
-      jsonText = jsonText.trim()
-      
-      // Step 2: Fix double curly braces (common Gemini issue: {{ instead of {)
-      // Handle cases like: {{ "score": ... }} or { { "score": ... } }
-      jsonText = jsonText.replace(/^\{\s*\{/, '{') // Replace {{ with {
-      jsonText = jsonText.replace(/\}\s*\}\s*$/, '}') // Replace }} with }
-      
-      // Step 3: Find the JSON object (handle extra text before/after)
-      const jsonObjectMatch = jsonText.match(/\{[\s\S]*\}/)
-      if (jsonObjectMatch) {
-        jsonText = jsonObjectMatch[0]
-      }
-      
-      // Step 4: Clean up any remaining artifacts
-      jsonText = jsonText.replace(/^`+|`+$/g, '') // Remove backticks
-      jsonText = jsonText.replace(/^\s+|\s+$/g, '') // Remove whitespace
-      
-      // Step 5: Fix any remaining double braces or formatting issues
-      // Remove any leading text before first {
-      const firstBraceIndex = jsonText.indexOf('{')
-      if (firstBraceIndex > 0) {
-        jsonText = jsonText.substring(firstBraceIndex)
-      }
-      
-      // Remove any trailing text after last }
-      const lastBraceIndex = jsonText.lastIndexOf('}')
-      if (lastBraceIndex >= 0 && lastBraceIndex < jsonText.length - 1) {
-        jsonText = jsonText.substring(0, lastBraceIndex + 1)
-      }
-      
-      // Final cleanup: ensure single braces
-      jsonText = jsonText.replace(/^\{\s*\{/, '{')
-      jsonText = jsonText.replace(/\}\s*\}\s*$/, '}')
-      jsonText = jsonText.trim()
+        .replace(/^```(?:json)?\s*/i, '')
+        .replace(/\s*```$/i, '')
+        .trim()
 
-      // Validate that we have something that looks like JSON
-      if (!jsonText.startsWith('{') || !jsonText.endsWith('}')) {
+      const firstBrace = jsonText.indexOf('{')
+      if (firstBrace === -1) {
         throw new Error(
-          `Invalid JSON response from Gemini. Expected JSON object but received: ${responseText.substring(0, 200)}...`
+          `Invalid JSON response from Gemini. No JSON object found. Received: ${responseText.substring(0, 200)}...`
         )
       }
+
+      let braceCount = 0
+      let endIndex = -1
+      for (let i = firstBrace; i < jsonText.length; i++) {
+        const c = jsonText[i]
+        if (c === '{') braceCount++
+        else if (c === '}') {
+          braceCount--
+          if (braceCount === 0) {
+            endIndex = i
+            break
+          }
+        }
+      }
+
+      if (endIndex === -1) {
+        // Truncated response - retry once
+        if (retryCount < maxRetries) {
+          await new Promise((r) => setTimeout(r, 2000))
+          return this.evaluateResume(resumeText, jobDescription, retryCount + 1, maxRetries)
+        }
+        throw new Error(
+          `Invalid JSON response from Gemini (truncated or malformed). Response: ${responseText.substring(0, 200)}...`
+        )
+      }
+
+      jsonText = jsonText.substring(firstBrace, endIndex + 1)
 
       let result
       try {
@@ -200,48 +200,20 @@ Return ONLY the JSON object starting with { and ending with }. Nothing before, n
       } catch (parseError) {
         console.error('JSON Parse Error:', parseError)
         console.error('Attempted to parse:', jsonText.substring(0, 500))
-        console.error('Full original response:', responseText)
-        
-        // Last resort: try to extract just the JSON part more aggressively
-        try {
-          // Find the innermost complete JSON object
-          let braceCount = 0
-          let startIndex = -1
-          let endIndex = -1
-          
-          for (let i = 0; i < responseText.length; i++) {
-            if (responseText[i] === '{') {
-              if (startIndex === -1) startIndex = i
-              braceCount++
-            } else if (responseText[i] === '}') {
-              braceCount--
-              if (braceCount === 0 && startIndex !== -1) {
-                endIndex = i
-                break
-              }
-            }
-          }
-          
-          if (startIndex !== -1 && endIndex !== -1) {
-            jsonText = responseText.substring(startIndex, endIndex + 1)
-            result = JSON.parse(jsonText)
-            console.log('Successfully parsed after aggressive extraction')
-          } else {
-            throw parseError
-          }
-        } catch (finalError) {
-          const errorMessage = parseError instanceof Error ? parseError.message : String(parseError)
-          throw new Error(
-            `Failed to parse JSON response. Gemini returned invalid JSON format. Please try again. Error: ${errorMessage}. Response preview: ${responseText.substring(0, 300)}...`
-          )
-        }
+        throw new Error(
+          `Failed to parse JSON from Gemini. Please try again. Response preview: ${responseText.substring(0, 200)}...`
+        )
       }
 
       // Validate and normalize result
       return {
         score: Math.max(0, Math.min(100, parseInt(result.score) || 0)),
-        missing_skills: Array.isArray(result.missing_skills)
-          ? result.missing_skills
+        missing_skills: Array.isArray(result.missing_skills) ? result.missing_skills : [],
+        must_have_matched_skills: Array.isArray(result.must_have_matched_skills)
+          ? result.must_have_matched_skills
+          : [],
+        nice_to_have_matched_skills: Array.isArray(result.nice_to_have_matched_skills)
+          ? result.nice_to_have_matched_skills
           : [],
         summary: result.summary || 'No summary provided',
       }

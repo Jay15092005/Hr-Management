@@ -36,7 +36,7 @@ export default function AIScoring({ resumes, jobDescription, compact = false }: 
         .select('*')
         .eq('resume_id', resume.id)
         .eq('job_description_id', jobDescription.id)
-        .single()
+        .maybeSingle()
 
       if (existingScore) {
         setScores((prev) => new Map(prev.set(resume.id, existingScore)))
@@ -44,18 +44,14 @@ export default function AIScoring({ resumes, jobDescription, compact = false }: 
         return
       }
 
-      // Extract text from resume (simplified - would need proper PDF/DOCX parsing)
-      // For now, we'll use a placeholder approach
-      let resumeText = `Candidate Name: ${resume.name}\nEmail: ${resume.email}\nExperience: ${resume.years_of_experience || 0} years\nLocation: ${resume.location || 'Not specified'}\nDegree: ${resume.degree || 'Not specified'}\n\nResume text extraction from PDF/DOCX files requires additional libraries. For now, please ensure resume text is available or use text files.`
-      
-      // Try to extract if it's a text file
+      // Extract text from resume (PDF, DOCX, TXT)
+      let resumeText = ''
       try {
-        if (resume.resume_file_url && resume.resume_file_url.endsWith('.txt')) {
-          resumeText = await extractResumeTextFromUrl(resume.resume_file_url)
-        }
+        resumeText = await extractResumeTextFromUrl(resume.resume_file_url)
       } catch (err) {
-        console.warn('Could not extract text from resume:', err)
-        // Continue with basic info
+        console.warn('Could not extract text from resume file, using basic info:', err)
+        // Fallback to basic candidate info if extraction fails
+        resumeText = `Candidate Name: ${resume.name}\nEmail: ${resume.email}\nExperience: ${resume.years_of_experience || 0} years\nLocation: ${resume.location || 'Not specified'}\nDegree: ${resume.degree || 'Not specified'}`
       }
 
       // Call Gemini API
@@ -74,6 +70,8 @@ export default function AIScoring({ resumes, jobDescription, compact = false }: 
             job_description_id: jobDescription.id,
             score: evaluation.score,
             missing_skills: evaluation.missing_skills,
+            must_have_matched_skills: evaluation.must_have_matched_skills,
+            nice_to_have_matched_skills: evaluation.nice_to_have_matched_skills,
             summary: evaluation.summary,
             resume_text: resumeText,
           },
@@ -253,6 +251,26 @@ export default function AIScoring({ resumes, jobDescription, compact = false }: 
                     <div className="score-summary">
                       <strong>Summary:</strong> {score.summary}
                     </div>
+                    {(score.must_have_matched_skills?.length ?? 0) > 0 && (
+                      <div className="matched-skills must-have">
+                        <strong>Must-have matched:</strong>
+                        <ul>
+                          {(score.must_have_matched_skills ?? []).map((skill, idx) => (
+                            <li key={idx}>{skill}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {(score.nice_to_have_matched_skills?.length ?? 0) > 0 && (
+                      <div className="matched-skills nice-to-have">
+                        <strong>Nice-to-have matched:</strong>
+                        <ul>
+                          {(score.nice_to_have_matched_skills ?? []).map((skill, idx) => (
+                            <li key={idx}>{skill}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                     {score.missing_skills.length > 0 && (
                       <div className="missing-skills">
                         <strong>Missing Skills:</strong>

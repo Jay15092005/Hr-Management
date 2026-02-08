@@ -9,6 +9,7 @@ import {
   type InterviewConfiguration,
 } from '../lib/supabase'
 import InterviewScheduler from './InterviewScheduler'
+import { sendSelectionEmail } from '../utils/email'
 import './CandidateDetail.css'
 
 export default function CandidateDetail() {
@@ -22,6 +23,7 @@ export default function CandidateDetail() {
   const [selection, setSelection] = useState<CandidateSelection | null>(null)
   const [interview, setInterview] = useState<InterviewConfiguration | null>(null)
   const [processing, setProcessing] = useState(false)
+  const [emailStatus, setEmailStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [showScheduleModal, setShowScheduleModal] = useState(false)
   const [showInstantModal, setShowInstantModal] = useState(false)
   const [instantLoading, setInstantLoading] = useState(false)
@@ -42,7 +44,7 @@ export default function CandidateDetail() {
         .select('*')
         .eq('resume_id', resumeId)
         .eq('job_description_id', jobId)
-        .single()
+        .maybeSingle()
       setScore(scoreData as ResumeScore | null)
 
       const { data: selData } = await supabase
@@ -109,22 +111,82 @@ export default function CandidateDetail() {
   }, [jobId, resumeId])
 
   const handleSelect = async () => {
-    if (!jobId || !resumeId) return
+    if (!jobId || !resumeId || !resume || !job) return
     setProcessing(true)
     setError(null)
+    setEmailStatus(null)
     try {
-      await supabase.from('candidate_selections').upsert(
-        {
-          resume_id: resumeId,
-          job_description_id: jobId,
-          status: 'selected',
-          selected_at: new Date().toISOString(),
-        },
-        { onConflict: 'resume_id,job_description_id' }
-      )
+      console.log('[CandidateDetail] Select: upserting candidate_selections...')
+      const { data: selectionData, error: upsertError } = await supabase
+        .from('candidate_selections')
+        .upsert(
+          {
+            resume_id: resumeId,
+            job_description_id: jobId,
+            status: 'selected',
+            selected_at: new Date().toISOString(),
+          },
+          { onConflict: 'resume_id,job_description_id' }
+        )
+        .select('id')
+        .single()
+
+      if (upsertError) {
+        console.error('[CandidateDetail] Upsert error:', upsertError)
+        throw upsertError
+      }
+      const selectionId = selectionData?.id
+      console.log('[CandidateDetail] Selection saved, id:', selectionId)
+
+      const timeSlots: { at: string; label: string }[] = []
+      let d = new Date()
+      for (let i = 0; i < 14 && timeSlots.length < 6; i++) {
+        d.setDate(d.getDate() + 1)
+        const weekday = d.getDay()
+        if (weekday === 0 || weekday === 6) continue
+        const dateStr = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+        const ten = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 10, 0, 0, 0)
+        timeSlots.push({ at: ten.toISOString(), label: `${dateStr}, 10:00 AM` })
+        if (timeSlots.length < 6) {
+          const two = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 14, 0, 0, 0)
+          timeSlots.push({ at: two.toISOString(), label: `${dateStr}, 2:00 PM` })
+        }
+      }
+
+      const confirmBaseUrl = typeof window !== 'undefined' ? window.location.origin : ''
+      console.log('[CandidateDetail] Calling sendSelectionEmail, to:', resume.email, 'confirmBaseUrl:', confirmBaseUrl)
+      const emailResult = await sendSelectionEmail({
+        to: resume.email,
+        candidateName: resume.name,
+        jobTitle: job.title,
+        candidateSelectionId: selectionId,
+        timeSlots: timeSlots.slice(0, 6),
+        confirmBaseUrl,
+      })
+      console.log('[CandidateDetail] Email result:', emailResult)
+
+      if (emailResult.ok) {
+        setEmailStatus({ type: 'success', message: 'Selection email sent successfully.' })
+        await supabase
+          .from('candidate_selections')
+          .update({
+            email_sent: true,
+            email_sent_at: new Date().toISOString(),
+          })
+          .eq('resume_id', resumeId)
+          .eq('job_description_id', jobId)
+      } else {
+        setEmailStatus({
+          type: 'error',
+          message: `Selection saved but email failed: ${emailResult.error || 'Unknown error'}. Check console and Supabase Edge Function logs.`,
+        })
+      }
+
       await loadData()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed')
+      const msg = err instanceof Error ? err.message : 'Failed'
+      console.error('[CandidateDetail] handleSelect error:', err)
+      setError(msg)
     } finally {
       setProcessing(false)
     }
@@ -284,6 +346,18 @@ export default function CandidateDetail() {
       </header>
 
       {error && <div className="candidate-detail-error-inline">{error}</div>}
+      {emailStatus && (
+        <div
+          className={
+            emailStatus.type === 'success'
+              ? 'candidate-detail-email-status success'
+              : 'candidate-detail-email-status error'
+          }
+        >
+          {emailStatus.type === 'success' ? '✓ ' : '⚠ '}
+          {emailStatus.message}
+        </div>
+      )}
 
       <section className="candidate-detail-section candidate-detail-actions">
         <h2>Actions</h2>
@@ -403,6 +477,26 @@ export default function CandidateDetail() {
               <div className="detail-block">
                 <strong>Summary</strong>
                 <p>{score.summary}</p>
+              </div>
+            )}
+            {(score.must_have_matched_skills?.length ?? 0) > 0 && (
+              <div className="detail-block">
+                <strong>Must-have matched skills</strong>
+                <ul>
+                  {(score.must_have_matched_skills ?? []).map((s, i) => (
+                    <li key={i}>{s}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {(score.nice_to_have_matched_skills?.length ?? 0) > 0 && (
+              <div className="detail-block">
+                <strong>Nice-to-have matched skills</strong>
+                <ul>
+                  {(score.nice_to_have_matched_skills ?? []).map((s, i) => (
+                    <li key={i}>{s}</li>
+                  ))}
+                </ul>
               </div>
             )}
             {score.missing_skills?.length > 0 && (
