@@ -5,6 +5,7 @@ import {
   useParticipant,
   VideoPlayer,
 } from '@videosdk.live/react-sdk'
+import { Constants, useTranscription } from '@videosdk.live/react-sdk'
 import { supabase } from '../lib/supabase'
 import { validateVideoSDKRoom, getMeetingJoinUrl } from '../utils/videosdk'
 import './InterviewRoom.css'
@@ -14,6 +15,11 @@ interface InterviewRoomProps {
   candidateName: string
   onLeave: () => void
 }
+
+// Feature flag: enable/disable realtime transcription integration.
+// Default is false; set VITE_ENABLE_REALTIME_TRANSCRIPTION=true in .env to turn it on.
+const ENABLE_REALTIME_TRANSCRIPTION =
+  import.meta.env.VITE_ENABLE_REALTIME_TRANSCRIPTION === 'true'
 
 // Get VideoSDK JWT token from Edge Function
 const getVideoSDKToken = async (): Promise<string | null> => {
@@ -121,6 +127,59 @@ function MeetingView({ roomId, candidateName, onLeave }: InterviewRoomProps) {
   const [error, setError] = useState<string | null>(null)
   const [roomValid, setRoomValid] = useState<boolean | null>(null)
 
+  // Realtime transcription → save lines to Supabase
+  const { startTranscription, stopTranscription } = useTranscription({
+    onTranscriptionStateChanged: (data) => {
+      console.log('[Transcription] state changed:', data)
+      const { status, id } = data
+      if (status === Constants.transcriptionEvents.TRANSCRIPTION_STARTING) {
+        console.log('[Transcription] starting', id)
+      } else if (status === Constants.transcriptionEvents.TRANSCRIPTION_STARTED) {
+        console.log('[Transcription] started', id)
+      } else if (status === Constants.transcriptionEvents.TRANSCRIPTION_STOPPING) {
+        console.log('[Transcription] stopping', id)
+      } else if (status === Constants.transcriptionEvents.TRANSCRIPTION_STOPPED) {
+        console.log('[Transcription] stopped', id)
+      }
+    },
+    onTranscriptionText: async (data) => {
+      try {
+        const { participantId, participantName, text, timestamp, type } = data
+        console.log('[Transcription] text event:', {
+          roomId,
+          participantId,
+          participantName,
+          text,
+          timestamp,
+          type,
+        })
+        if (!text || !text.trim()) {
+          console.log('[Transcription] text empty/whitespace, skipping')
+          return
+        }
+
+        // Send one line to Supabase Edge Function
+        const { data: fnData, error } = await supabase.functions.invoke('save-meeting-transcript', {
+          body: {
+            roomId: roomId,
+            participantId,
+            participantName,
+            text,
+            timestamp,
+            type,
+          },
+        })
+        if (error) {
+          console.error('[Transcription] Failed to save transcript line (Supabase error):', error)
+        } else {
+          console.log('[Transcription] Line saved OK:', fnData)
+        }
+      } catch (e) {
+        console.error('[Transcription] Exception while saving transcript line:', e)
+      }
+    },
+  })
+
   // Validate room before allowing join
   useEffect(() => {
     const validateRoom = async () => {
@@ -167,12 +226,63 @@ function MeetingView({ roomId, candidateName, onLeave }: InterviewRoomProps) {
     validateRoom()
   }, [roomId])
 
-  const { join, participants } = useMeeting({
+  const { join, participants, startRecording, stopRecording } = useMeeting({
     onMeetingJoined: () => {
       setJoined('JOINED')
       setError(null)
+      // Start realtime transcription for this meeting
+      if (ENABLE_REALTIME_TRANSCRIPTION) {
+        try {
+          console.log('[Transcription] calling startTranscription for room', roomId)
+          startTranscription({})
+        } catch (e) {
+          console.error('[Transcription] Failed to start transcription:', e)
+        }
+      } else {
+        console.log(
+          '[Transcription] realtime transcription disabled (VITE_ENABLE_REALTIME_TRANSCRIPTION is not true)'
+        )
+      }
+
+      // Start recording with post-transcription config
+      try {
+        const webhookUrl = import.meta.env.VITE_VIDEOSDK_WEBHOOK_URL || null
+        const transcriptionConfig: any = {
+          enabled: true,
+          summary: {
+            enabled: true,
+            prompt:
+              import.meta.env.VITE_TRANSCRIPTION_SUMMARY_PROMPT ||
+              'Write summary in sections like Title, Agenda, Speakers, Action Items, Outlines, Notes and Summary',
+          },
+        }
+        console.log('[Recording] startRecording called', {
+          webhookUrl,
+          hasPrompt: !!transcriptionConfig.summary.prompt,
+        })
+        // If you don't have a webhookUrl or awsDirPath, you should pass null (per VideoSDK docs)
+        startRecording(webhookUrl, null, null, transcriptionConfig)
+      } catch (e) {
+        console.error('[Recording] Failed to start recording with transcription:', e)
+      }
     },
     onMeetingLeft: () => {
+      if (ENABLE_REALTIME_TRANSCRIPTION) {
+        try {
+          stopTranscription()
+        } catch (e) {
+          console.error('[Transcription] Failed to stop transcription:', e)
+        }
+      }
+
+      // Stop recording when meeting ends
+      try {
+        console.log('[Recording] stopRecording called')
+        stopRecording()
+      } catch (e) {
+        console.error('[Recording] Failed to stop recording:', e)
+      }
+
       onLeave()
     },
     onError: (error) => {

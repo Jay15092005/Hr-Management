@@ -405,6 +405,15 @@ export default function MeetingOverview() {
                         >
                           Details
                         </button>
+                        {row.roomId && (
+                          <button
+                            className="mo-btn mo-btn-sm"
+                            onClick={() => navigate(`/transcripts/${row.roomId}`)}
+                            title="View transcript"
+                          >
+                            Transcript
+                          </button>
+                        )}
                       </td>
                     </tr>
                   )

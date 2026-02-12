@@ -41,6 +41,24 @@
   border-radius: 8px;
 }
 
+.pd-error-inline {
+  padding: 0.6rem 0.9rem;
+  border-radius: 6px;
+  background: #ffebee;
+  color: #c62828;
+  font-size: 0.85rem;
+  margin: 0 0 0.75rem;
+}
+
+.pd-info-inline {
+  padding: 0.6rem 0.9rem;
+  border-radius: 6px;
+  background: #e8f5e9;
+  color: #2e7d32;
+  font-size: 0.85rem;
+  margin: 0 0 0.75rem;
+}
+
 /* ── Header ── */
 .pd-header {
   display: flex;

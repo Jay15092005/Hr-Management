@@ -5,6 +5,11 @@ const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const confirmSecret = Deno.env.get("CONFIRM_INTERVIEW_SECRET") || "";
 
+const MIN_LEAD_TIME_MINUTES =
+  Number(Deno.env.get("MIN_LEAD_TIME_MINUTES") ?? "10") || 10;
+const SELECTION_LINK_TTL_DAYS =
+  Number(Deno.env.get("SELECTION_LINK_TTL_DAYS") ?? "2") || 2;
+
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 async function sendSlotConfirmationEmail(
@@ -101,8 +106,34 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // Enforce 2-day expiry for selection links based on selection timestamps
+    const { data: selRow, error: selErr } = await supabase
+      .from("candidate_selections")
+      .select("selected_at, email_sent_at")
+      .eq("id", selectionId)
+      .single();
+
+    if (selErr || !selRow) {
+      return new Response(
+        JSON.stringify({ error: "Invalid or expired link" }),
+        { status: 403, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }
+      );
+    }
+
+    const nowMs = Date.now();
+    const twoDaysMs = SELECTION_LINK_TTL_DAYS * 24 * 60 * 60 * 1000;
+    const selectedAtMs = selRow.selected_at ? new Date(selRow.selected_at).getTime() : 0;
+    const emailSentAtMs = selRow.email_sent_at ? new Date(selRow.email_sent_at).getTime() : 0;
+    const refMs = emailSentAtMs || selectedAtMs;
+    if (!refMs || nowMs - refMs > twoDaysMs) {
+      return new Response(
+        JSON.stringify({ error: "This link has expired. Please request a new interview link." }),
+        { status: 403, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }
+      );
+    }
+
     const now = new Date();
-    const minTime = new Date(now.getTime() + 10 * 60 * 1000);
+    const minTime = new Date(now.getTime() + MIN_LEAD_TIME_MINUTES * 60 * 1000);
     if (scheduledAt.getTime() < minTime.getTime()) {
       return new Response(
         JSON.stringify({ error: "This time slot is less than 10 minutes from now. Please choose a later slot." }),

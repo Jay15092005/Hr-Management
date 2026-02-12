@@ -8,6 +8,7 @@ import CandidateDetail from './components/CandidateDetail'
 import ConfirmInterview from './components/ConfirmInterview'
 import ScheduleInterview from './components/ScheduleInterview'
 import PipelineDetail from './components/PipelineDetail'
+import MeetingTranscripts from './components/MeetingTranscripts'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
@@ -17,6 +18,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           <Route index element={<Dashboard />} />
           <Route path="candidate/:jobId/:resumeId" element={<CandidateDetail />} />
           <Route path="pipeline/:selectionId" element={<PipelineDetail />} />
+          <Route path="transcripts/:roomId" element={<MeetingTranscripts />} />
         </Route>
         <Route path="/confirm-interview" element={<ConfirmInterview />} />
         <Route path="/schedule-interview" element={<ScheduleInterview />} />

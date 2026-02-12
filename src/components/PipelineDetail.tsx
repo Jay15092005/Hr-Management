@@ -27,6 +27,7 @@ function fmtDateTime(iso: string | null | undefined): string {
 /* ── types ── */
 interface PageData {
   /* candidate */
+  resumeId: string
   name: string
   email: string
   location: string | null
@@ -36,6 +37,7 @@ interface PageData {
   resumeFileName: string | null
   appliedAt: string | null
   /* job */
+  jobId: string
   jobTitle: string
   jobDescription: string
   requiredSkills: string[]
@@ -95,6 +97,10 @@ export default function PipelineDetail() {
   const [data, setData] = useState<PageData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [actionMessage, setActionMessage] = useState<string | null>(null)
+  const [resetLoading, setResetLoading] = useState(false)
+  const [instantLoading, setInstantLoading] = useState(false)
 
   useEffect(() => {
     if (!selectionId) return
@@ -144,6 +150,7 @@ export default function PipelineDetail() {
         .maybeSingle()
 
       setData({
+        resumeId: resume.id,
         name: resume.name,
         email: resume.email,
         location: resume.location,
@@ -152,6 +159,7 @@ export default function PipelineDetail() {
         resumeUrl: resume.resume_file_url,
         resumeFileName: resume.resume_file_name,
         appliedAt: resume.date_of_application,
+        jobId: job.id,
         jobTitle: job.title,
         jobDescription: job.description,
         requiredSkills: job.required_skills ?? [],
@@ -187,6 +195,82 @@ export default function PipelineDetail() {
     }
   }
 
+  const handleResetAll = async () => {
+    if (!selectionId || !data) return
+    if (!confirm('Reset score, selection, and interview for this candidate?')) return
+    setResetLoading(true)
+    setActionError(null)
+    setActionMessage(null)
+    try {
+      // Delete score
+      await supabase
+        .from('resume_scores')
+        .delete()
+        .eq('resume_id', data.resumeId)
+        .eq('job_description_id', data.jobId)
+
+      // Delete interview configuration(s)
+      await supabase
+        .from('interview_configurations')
+        .delete()
+        .eq('candidate_selection_id', selectionId)
+
+      // Delete selection row
+      await supabase
+        .from('candidate_selections')
+        .delete()
+        .eq('id', selectionId)
+
+      setActionMessage('Candidate reset successfully (score, selection, and schedule cleared).')
+      await load()
+    } catch (err) {
+      setActionError(
+        err instanceof Error ? err.message : 'Failed to reset candidate. Please try again.'
+      )
+    } finally {
+      setResetLoading(false)
+    }
+  }
+
+  const handleInstantInterview = async () => {
+    if (!selectionId || !data) return
+    setInstantLoading(true)
+    setActionError(null)
+    setActionMessage(null)
+    try {
+      const { data: fnData, error: fnErr } = await supabase.functions.invoke(
+        'create-instant-interview',
+        {
+          body: {
+            candidate_selection_id: selectionId,
+            interview_type: 'Technical Interview',
+            difficulty_level: 'Medium',
+            duration_minutes: 60,
+            coding_round: false,
+          },
+        }
+      )
+      if (fnErr) throw fnErr
+      if (fnData?.error) throw new Error(fnData.error)
+      if (fnData?.success) {
+        setActionMessage('Instant interview created successfully.')
+        await load()
+        const joinUrl = fnData.join_url as string | undefined
+        if (joinUrl && confirm('Interview created. Open room now?')) {
+          window.open(joinUrl, '_blank')
+        }
+      } else {
+        throw new Error('Failed to create instant interview')
+      }
+    } catch (err) {
+      setActionError(
+        err instanceof Error ? err.message : 'Failed to create instant interview. Please try again.'
+      )
+    } finally {
+      setInstantLoading(false)
+    }
+  }
+
   /* ── render ── */
   if (loading) {
     return (
@@ -219,6 +303,9 @@ export default function PipelineDetail() {
       >
         &larr; Back to Meeting Details
       </button>
+
+      {actionError && <p className="pd-error-inline">{actionError}</p>}
+      {actionMessage && <p className="pd-info-inline">{actionMessage}</p>}
 
       {/* ── Header ── */}
       <header className="pd-header">
@@ -411,6 +498,40 @@ export default function PipelineDetail() {
               </table>
             ) : (
               <p className="pd-empty">No interview scheduled yet.</p>
+            )}
+            {data.roomId && (
+              <div style={{ marginTop: '0.75rem' }}>
+                <button
+                  className="pd-back"
+                  style={{ marginBottom: 0 }}
+                  onClick={() => navigate(`/transcripts/${data.roomId}`)}
+                >
+                  View Transcript
+                </button>
+              </div>
+            )}
+
+            {data.selectionStatus === 'selected' && (
+              <div className="pd-interview-actions">
+                <button
+                  type="button"
+                  className="pd-back"
+                  style={{ marginBottom: 0, marginRight: '0.5rem' }}
+                  onClick={handleInstantInterview}
+                  disabled={instantLoading}
+                >
+                  {instantLoading ? 'Creating…' : '⚡ Instant Interview'}
+                </button>
+                <button
+                  type="button"
+                  className="pd-back"
+                  style={{ marginBottom: 0 }}
+                  onClick={handleResetAll}
+                  disabled={resetLoading}
+                >
+                  {resetLoading ? 'Resetting…' : '🔄 Reset (score & selection)'}
+                </button>
+              </div>
             )}
           </section>
         </div>

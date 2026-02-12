@@ -3,6 +3,8 @@ import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import './ScheduleInterview.css'
 
+const MIN_LEAD_MINUTES = Number(import.meta.env.VITE_MIN_LEAD_TIME_MINUTES ?? '10')
+
 export default function ScheduleInterview() {
   const [searchParams] = useSearchParams()
   const [status, setStatus] = useState<'form' | 'submitting' | 'success' | 'error'>('form')
@@ -30,9 +32,9 @@ export default function ScheduleInterview() {
     const [year, month, day] = dateVal.split('-').map(Number)
     const [hour, minute] = timeVal.split(':').map(Number)
     const scheduled = new Date(year, month - 1, day, hour, minute, 0, 0)
-    const minAllowed = new Date(Date.now() + 10 * 60 * 1000)
+    const minAllowed = new Date(Date.now() + MIN_LEAD_MINUTES * 60 * 1000)
     if (scheduled.getTime() < minAllowed.getTime()) {
-      setSubmitError('Please choose a time at least 10 minutes from now.')
+      setSubmitError(`Please choose a time at least ${MIN_LEAD_MINUTES} minutes from now.`)
       return
     }
     const slot = scheduled.toISOString()
