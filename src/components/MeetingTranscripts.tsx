@@ -97,10 +97,21 @@ export default function MeetingTranscripts() {
       })
       if (error) {
         console.error('Import error:', error)
-        setError(error.message || 'Failed to import transcript from VideoSDK.')
+        const status = (error as any)?.status
+        if (status === 404) {
+          setError(
+            'No transcription found for this meeting in VideoSDK. Make sure recording and transcription are enabled and processing has finished.'
+          )
+        } else {
+          setError(error.message || 'Failed to import transcript from VideoSDK.')
+        }
       } else if (data?.error) {
         console.error('Import data error:', data)
-        setError(data.error || 'Failed to import transcript from VideoSDK.')
+        setError(
+          data.error === 'No post transcription found for this room'
+            ? 'No transcription found for this meeting in VideoSDK. It may not have been recorded or is still processing.'
+            : data.error || 'Failed to import transcript from VideoSDK.'
+        )
       } else {
         await load()
       }
@@ -167,8 +178,8 @@ export default function MeetingTranscripts() {
 
       {!loading && !error && rows.length === 0 && (
         <p className="mt-info">
-          No transcript lines found yet for this meeting. The transcript will appear here after
-          realtime transcription starts saving lines.
+          No transcript is stored for this meeting yet. Use "Import from VideoSDK" after the recording
+          and transcription are completed to pull the transcript here.
         </p>
       )}
 

@@ -267,6 +267,22 @@ function MeetingView({ roomId, candidateName, onLeave }: InterviewRoomProps) {
       }
     },
     onMeetingLeft: () => {
+      // Mark interview as completed in Supabase (if it exists)
+      ;(async () => {
+        try {
+          console.log('[InterviewRoom] Marking interview completed for room', roomId)
+          const { error: updateError } = await supabase
+            .from('interview_configurations')
+            .update({ status: 'completed', updated_at: new Date().toISOString() })
+            .eq('room_id', roomId)
+          if (updateError) {
+            console.error('[InterviewRoom] Failed to mark interview completed:', updateError)
+          }
+        } catch (e) {
+          console.error('[InterviewRoom] Exception while marking interview completed:', e)
+        }
+      })()
+
       if (ENABLE_REALTIME_TRANSCRIPTION) {
         try {
           stopTranscription()
