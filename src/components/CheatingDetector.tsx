@@ -63,7 +63,7 @@ export default function CheatingDetector({ videoElement, roomId, enabled = true 
     const config = {
         enabled: import.meta.env.VITE_ENABLE_CHEATING_DETECTION === 'true' && enabled,
         sensitivity: import.meta.env.VITE_DETECTION_SENSITIVITY || 'medium',
-        gazeAwayThreshold: parseInt(import.meta.env.VITE_GAZE_AWAY_THRESHOLD || '3000'),
+        gazeAwayThreshold: parseInt(import.meta.env.VITE_GAZE_AWAY_THRESHOLD || '1500'),
         headTurnAngleThreshold: parseInt(import.meta.env.VITE_HEAD_TURN_ANGLE_THRESHOLD || '30'),
         attentionScoreThreshold: parseInt(import.meta.env.VITE_ATTENTION_SCORE_THRESHOLD || '50'),
     }
@@ -76,77 +76,85 @@ export default function CheatingDetector({ videoElement, roomId, enabled = true 
         hasVideo: !!videoElement,
     })
 
-    // Calculate gaze direction from iris landmarks
+    // Calculate gaze direction: use iris when available (478 landmarks), else fall back to head pose (468)
     const calculateGazeDirection = (landmarks: any[]): GazeData => {
-        if (!landmarks || landmarks.length < 478) {
+        if (!landmarks || landmarks.length < 468) {
             return { direction: 'center', confidence: 0 }
         }
 
-        // Left eye iris center (landmark 468)
-        const leftIris = landmarks[468]
-        // Left eye corners (landmarks 33, 133)
-        const leftEyeLeft = landmarks[33]
-        const leftEyeRight = landmarks[133]
-
-        // Calculate iris position relative to eye width
-        const eyeWidth = Math.abs(leftEyeRight.x - leftEyeLeft.x)
-        const irisOffset = (leftIris.x - leftEyeLeft.x) / eyeWidth
-
-        // Determine direction based on iris position
+        const hasIris = landmarks.length >= 478
         let direction: GazeData['direction'] = 'center'
-        let confidence = 0.8
+        let confidence = 0.7
 
-        // TUNING: Thresholds for gaze detection
-        // Smaller threshold (< 0.30) means looking RIGHT (towards nose for left eye)
-        // Larger threshold (> 0.70) means looking LEFT (away from nose for left eye)
+        if (hasIris) {
+            // Iris-based gaze (refined landmarks 468+)
+            const leftIris = landmarks[468]
+            const leftEyeLeft = landmarks[33]
+            const leftEyeRight = landmarks[133]
+            const eyeWidth = Math.abs(leftEyeRight.x - leftEyeLeft.x) || 0.01
+            const irisOffsetX = (leftIris.x - leftEyeLeft.x) / eyeWidth
 
-        if (irisOffset < 0.30) {
-            direction = 'right'
-            confidence = 0.9
-        } else if (irisOffset > 0.70) {
-            direction = 'left'
-            confidence = 0.9
-        }
+            const leftEyeTop = landmarks[159]
+            const leftEyeBottom = landmarks[145]
+            const eyeHeight = Math.abs(leftEyeBottom.y - leftEyeTop.y) || 0.01
+            const irisOffsetY = (leftIris.y - leftEyeTop.y) / eyeHeight
 
-        // Check vertical gaze (simplified)
-        const leftEyeTop = landmarks[159]
-        const leftEyeBottom = landmarks[145]
-        const eyeHeight = Math.abs(leftEyeBottom.y - leftEyeTop.y)
-        const irisVerticalOffset = (leftIris.y - leftEyeTop.y) / eyeHeight
+            // Only count as "away" when clearly looking OUT OF SCREEN (not normal slight looks)
+            // Center band is wide: only extreme gaze triggers (up/down/left/right)
+            if (irisOffsetY < 0.25) {
+                direction = 'up'
+                confidence = 0.85
+            } else if (irisOffsetY > 0.75) {
+                direction = 'down'
+                confidence = 0.85
+            } else if (irisOffsetX < 0.28) {
+                direction = 'right'
+                confidence = 0.9
+            } else if (irisOffsetX > 0.72) {
+                direction = 'left'
+                confidence = 0.9
+            }
+        } else {
+            // Fallback: head pose — only trigger for clear head turn (out of screen), not small movements
+            const noseTip = landmarks[1]
+            const leftEye = landmarks[33]
+            const rightEye = landmarks[263]
+            const midX = (leftEye.x + rightEye.x) / 2
+            const midY = (leftEye.y + rightEye.y) / 2
+            const yaw = (noseTip.x - midX) * 120
+            const pitch = (noseTip.y - midY) * 120
 
-        if (irisVerticalOffset < 0.30) {
-            direction = 'up'
-            confidence = 0.85
-        } else if (irisVerticalOffset > 0.70) {
-            direction = 'down'
-            confidence = 0.85
+            const absYaw = Math.abs(yaw)
+            const absPitch = Math.abs(pitch)
+            const minAngle = 18
+            if (absPitch > minAngle && absPitch >= absYaw) {
+                direction = pitch < 0 ? 'up' : 'down'
+                confidence = 0.75
+            } else if (absYaw > minAngle) {
+                direction = yaw > 0 ? 'right' : 'left'
+                confidence = 0.75
+            }
         }
 
         return { direction, confidence }
     }
 
-    // Calculate head pose from face landmarks
+    // Calculate head pose from face landmarks (normalized 0–1; scaled so ~0.1 offset ≈ 15–20°)
     const calculateHeadPose = (landmarks: any[]): HeadPose => {
         if (!landmarks || landmarks.length < 468) {
             return { pitch: 0, yaw: 0, roll: 0 }
         }
 
-        // Key landmarks for head pose estimation
         const noseTip = landmarks[1]
         const leftEye = landmarks[33]
         const rightEye = landmarks[263]
-
-        // Calculate yaw (left/right rotation)
         const eyeMidpoint = {
             x: (leftEye.x + rightEye.x) / 2,
             y: (leftEye.y + rightEye.y) / 2,
         }
-        const yaw = (noseTip.x - eyeMidpoint.x) * 180 // Simplified calculation
-
-        // Calculate pitch (up/down rotation) - using nose to eye distance
-        const pitch = (noseTip.y - eyeMidpoint.y) * 180 // Simplified calculation
-
-        // Calculate roll (tilt)
+        const scale = 220
+        const yaw = (noseTip.x - eyeMidpoint.x) * scale
+        const pitch = (noseTip.y - eyeMidpoint.y) * scale
         const eyeAngle = Math.atan2(rightEye.y - leftEye.y, rightEye.x - leftEye.x)
         const roll = eyeAngle * (180 / Math.PI)
 
@@ -362,53 +370,49 @@ export default function CheatingDetector({ videoElement, roomId, enabled = true 
 
         const landmarks = results.multiFaceLandmarks[0]
 
+        // Head pose first (used for both head-turn and gaze fallback)
+        const headPose = calculateHeadPose(landmarks)
+        const headTurnAngle = Math.abs(headPose.yaw)
+
         // Analyze gaze direction
         const gaze = calculateGazeDirection(landmarks)
-        if (gaze.direction !== 'center') {
-            if (!gazeAwayStartRef.current) {
-                gazeAwayStartRef.current = now
-            } else if (now - gazeAwayStartRef.current > config.gazeAwayThreshold) {
-                violations.push(`Looking ${gaze.direction}`)
-                score -= 25
-
-                if (!lastAlertTimeRef.current['eyes_away'] ||
-                    now - lastAlertTimeRef.current['eyes_away'] > 5000) {
-                    const event: DetectionEvent = {
-                        type: 'eyes_away',
-                        severity: 'medium',
-                        confidence: gaze.confidence,
-                        timestamp: now,
-                    }
-                    detectionHistoryRef.current.push(event)
-                    saveDetectionEvent(event)
-                    lastAlertTimeRef.current['eyes_away'] = now
-                }
+        const isGazeAway = gaze.direction !== 'center'
+        if (isGazeAway) {
+            if (!gazeAwayStartRef.current) gazeAwayStartRef.current = now
+            const gazeAwayDuration = now - (gazeAwayStartRef.current ?? now)
+            // Show "Looking X" and drop score immediately so user gets instant feedback
+            violations.push(`Looking ${gaze.direction}`)
+            score -= 25
+            // Log to DB only after sustained gaze away (throttled)
+            if (gazeAwayDuration > config.gazeAwayThreshold &&
+                (!lastAlertTimeRef.current['eyes_away'] || now - lastAlertTimeRef.current['eyes_away'] > 5000)) {
+                saveDetectionEvent({
+                    type: 'eyes_away',
+                    severity: 'medium',
+                    confidence: gaze.confidence,
+                    timestamp: now,
+                })
+                lastAlertTimeRef.current['eyes_away'] = now
             }
         } else {
             gazeAwayStartRef.current = null
         }
 
-        // Analyze head pose
-        const headPose = calculateHeadPose(landmarks)
-        const headTurnAngle = Math.abs(headPose.yaw)
-
-        if (headTurnAngle > config.headTurnAngleThreshold) {
-            if (!headTurnStartRef.current) {
-                headTurnStartRef.current = now
-            } else if (now - headTurnStartRef.current > 2000) {
+        // Head turned away (lower threshold so it actually triggers)
+        const headThreshold = Math.min(config.headTurnAngleThreshold, 25)
+        if (headTurnAngle > headThreshold) {
+            if (!headTurnStartRef.current) headTurnStartRef.current = now
+            const headAwayDuration = now - (headTurnStartRef.current ?? now)
+            if (headAwayDuration > 1500) {
                 violations.push('Head turned away')
                 score -= 30
-
-                if (!lastAlertTimeRef.current['head_turned'] ||
-                    now - lastAlertTimeRef.current['head_turned'] > 5000) {
-                    const event: DetectionEvent = {
+                if (!lastAlertTimeRef.current['head_turned'] || now - lastAlertTimeRef.current['head_turned'] > 5000) {
+                    saveDetectionEvent({
                         type: 'head_turned',
                         severity: 'medium',
                         confidence: 0.85,
                         timestamp: now,
-                    }
-                    detectionHistoryRef.current.push(event)
-                    saveDetectionEvent(event)
+                    })
                     lastAlertTimeRef.current['head_turned'] = now
                 }
             }

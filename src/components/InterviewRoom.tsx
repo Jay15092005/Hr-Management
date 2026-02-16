@@ -77,9 +77,10 @@ function ParticipantView({ participantId, roomId }: { participantId: string; roo
   const [videoElement, setVideoElement] = useState<HTMLVideoElement | null>(null)
   const { micStream, webcamStream, webcamOn, micOn, isLocal, displayName } = useParticipant(participantId)
 
-  // Test mode: enable cheating detection on local participant for testing
+  // Run cheating detection on LOCAL participant so the candidate sees warnings on their own feed.
+  // (Previously it ran on remote only, so only observers saw the overlay.)
   const testMode = import.meta.env.VITE_CHEATING_DETECTION_TEST_MODE === 'true'
-  const shouldEnableDetection = testMode ? true : !isLocal
+  const shouldEnableDetection = testMode ? true : isLocal
 
   useEffect(() => {
     if (micRef.current) {
@@ -97,7 +98,7 @@ function ParticipantView({ participantId, roomId }: { participantId: string; roo
     }
   }, [micStream, micOn])
 
-  // Handle webcam stream for cheating detection
+  // Handle webcam stream for cheating detection (local = candidate's own feed)
   useEffect(() => {
     if (videoRef.current && webcamOn && webcamStream) {
       const mediaStream = new MediaStream()
@@ -105,12 +106,10 @@ function ParticipantView({ participantId, roomId }: { participantId: string; roo
       videoRef.current.srcObject = mediaStream
       videoRef.current.play().catch((error) => console.error('Video play failed:', error))
 
-      // Update state to trigger CheatingDetector re-render with valid video element
-      if (!isLocal) {
-        setVideoElement(videoRef.current)
-      }
+      // Pass video element for both local (candidate) and remote; detector runs when shouldEnableDetection is true
+      setVideoElement(videoRef.current)
     }
-  }, [webcamStream, webcamOn, isLocal])
+  }, [webcamStream, webcamOn])
 
   return (
     <div className="participant-view">
@@ -133,8 +132,7 @@ function ParticipantView({ participantId, roomId }: { participantId: string; roo
             }}
             className="video-player"
           />
-          {/* Hidden video element for cheating detection - only for non-local participants (candidates) */}
-          {/* Or for local participant if test mode is enabled */}
+          {/* Hidden video for cheating detection. Run on LOCAL so the candidate sees "Look up" etc. on their own tile. */}
           {shouldEnableDetection && (
             <>
               <video

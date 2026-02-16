@@ -74,33 +74,38 @@ echo ""
 echo -e "${BLUE}🤖 Starting AI Interview Agent...${NC}"
 cd "$SCRIPT_DIR/ai-agent"
 
+# Python venv path: Windows uses Scripts, macOS/Linux use bin
+if [ -f "venv/Scripts/python" ]; then
+    VENV_PYTHON="venv/Scripts/python"
+    VENV_ACTIVATE="venv/Scripts/activate"
+else
+    VENV_PYTHON="venv/bin/python"
+    VENV_ACTIVATE="venv/bin/activate"
+fi
+
 # Check if virtual environment exists
 if [ ! -d "venv" ]; then
-    echo -e "${YELLOW}Creating Python virtual environment...${NC}"
-    # Try to find Python 3.11 first
+    echo -e "${YELLOW}Creating Python virtual environment (Python 3.12)...${NC}"
     if command -v py >/dev/null 2>&1; then
-        py -3.11 -m venv venv || py -m venv venv
+        py -3.12 -m venv venv || py -3 -m venv venv || py -m venv venv
     else
-        python3.11 -m venv venv || python3 -m venv venv
+        python3.12 -m venv venv || python3 -m venv venv
     fi
-    
+    # Re-detect venv paths after creation
+    if [ -f "venv/Scripts/python" ]; then
+        VENV_PYTHON="venv/Scripts/python"
+        VENV_ACTIVATE="venv/Scripts/activate"
+    else
+        VENV_PYTHON="venv/bin/python"
+        VENV_ACTIVATE="venv/bin/activate"
+    fi
     echo -e "${YELLOW}Installing AI Agent dependencies...${NC}"
-    if [ -f "venv/Scripts/activate" ]; then
-        source venv/Scripts/activate
-    else
-        source venv/bin/activate
-    fi
-     # Use explicit path to ensure we use the venv's pip
-    venv/Scripts/python -m pip install -r requirements.txt
+    source "$VENV_ACTIVATE"
+    "$VENV_PYTHON" -m pip install -r requirements.txt
 else
-    if [ -f "venv/Scripts/activate" ]; then
-        source venv/Scripts/activate
-    else
-        source venv/bin/activate
-    fi
-    # Always ensure dependencies are up to date
+    source "$VENV_ACTIVATE"
     echo -e "${YELLOW}Checking AI Agent dependencies...${NC}"
-    venv/Scripts/python -m pip install -r requirements.txt
+    "$VENV_PYTHON" -m pip install -r requirements.txt
 fi
 
 # Check if .env exists
@@ -111,7 +116,7 @@ fi
 
 # Start AI agent in background
 # Use the python executable from the venv directly to ensure correct environment
-venv/Scripts/python main.py &
+"$VENV_PYTHON" main.py &
 AGENT_PID=$!
 echo -e "${GREEN}✅ AI Agent started (PID: $AGENT_PID)${NC}"
 
