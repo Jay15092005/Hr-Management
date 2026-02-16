@@ -30,7 +30,7 @@ interface DetectionEvent {
 }
 
 interface GazeData {
-    direction: 'center' | 'left' | 'right' | 'up' | 'down'
+    direction: 'center' | 'left' | 'right' | 'up' | 'down' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'above-camera'
     confidence: number
 }
 
@@ -49,6 +49,8 @@ export default function CheatingDetector({ videoElement, roomId, enabled = true 
     const cameraRef = useRef<Camera | null>(null)
     const detectionHistoryRef = useRef<DetectionEvent[]>([])
     const lastAlertTimeRef = useRef<{ [key: string]: number }>({})
+    const mobileModelRef = useRef<any>(null)
+    const isPhoneDetectedRef = useRef<boolean>(false)
 
     // Tracking start times for continuous violations
     const gazeAwayStartRef = useRef<number | null>(null)
@@ -77,63 +79,56 @@ export default function CheatingDetector({ videoElement, roomId, enabled = true 
     })
 
     // Calculate gaze direction: use iris when available (478 landmarks), else fall back to head pose (468)
+    // Calculate gaze direction using iris ("kiki") landmarks for precise eye tracking
     const calculateGazeDirection = (landmarks: any[]): GazeData => {
-        if (!landmarks || landmarks.length < 468) {
+        if (!landmarks || landmarks.length < 478) {
             return { direction: 'center', confidence: 0 }
         }
 
-        const hasIris = landmarks.length >= 478
+        // Left Eye indices (Outer: 33, Inner: 133, Top: 159, Bottom: 145, Iris: 468)
+        const leftIris = landmarks[468]
+        const leftWidth = Math.abs(landmarks[133].x - landmarks[33].x) || 0.01
+        const leftHeight = Math.abs(landmarks[145].y - landmarks[159].y) || 0.01
+        const leftX = (leftIris.x - Math.min(landmarks[33].x, landmarks[133].x)) / leftWidth
+        const leftY = (leftIris.y - landmarks[159].y) / leftHeight
+
+        // Right Eye indices (Outer: 263, Inner: 362, Top: 386, Bottom: 374, Iris: 473)
+        const rightIris = landmarks[473]
+        const rightWidth = Math.abs(landmarks[263].x - landmarks[362].x) || 0.01
+        const rightHeight = Math.abs(landmarks[374].y - landmarks[386].y) || 0.01
+        const rightX = (rightIris.x - Math.min(landmarks[362].x, landmarks[263].x)) / rightWidth
+        const rightY = (rightIris.y - landmarks[386].y) / rightHeight
+
+        // Average gaze offsets (Center is ~0.5)
+        const avgX = (leftX + rightX) / 2
+        const avgY = (leftY + rightY) / 2
+
         let direction: GazeData['direction'] = 'center'
-        let confidence = 0.7
+        let confidence = 0.95
 
-        if (hasIris) {
-            // Iris-based gaze (refined landmarks 468+)
-            const leftIris = landmarks[468]
-            const leftEyeLeft = landmarks[33]
-            const leftEyeRight = landmarks[133]
-            const eyeWidth = Math.abs(leftEyeRight.x - leftEyeLeft.x) || 0.01
-            const irisOffsetX = (leftIris.x - leftEyeLeft.x) / eyeWidth
+        // Extremely sensitive thresholds for "outside the window" detection
+        const xLow = 0.35, xHigh = 0.65
+        const yLow = 0.35, yHigh = 0.65
+        const yExtremeLow = 0.18 // Looked above the camera
 
-            const leftEyeTop = landmarks[159]
-            const leftEyeBottom = landmarks[145]
-            const eyeHeight = Math.abs(leftEyeBottom.y - leftEyeTop.y) || 0.01
-            const irisOffsetY = (leftIris.y - leftEyeTop.y) / eyeHeight
-
-            // Only count as "away" when clearly looking OUT OF SCREEN (not normal slight looks)
-            // Center band is wide: only extreme gaze triggers (up/down/left/right)
-            if (irisOffsetY < 0.25) {
-                direction = 'up'
-                confidence = 0.85
-            } else if (irisOffsetY > 0.75) {
-                direction = 'down'
-                confidence = 0.85
-            } else if (irisOffsetX < 0.28) {
-                direction = 'right'
-                confidence = 0.9
-            } else if (irisOffsetX > 0.72) {
-                direction = 'left'
-                confidence = 0.9
-            }
-        } else {
-            // Fallback: head pose — only trigger for clear head turn (out of screen), not small movements
-            const noseTip = landmarks[1]
-            const leftEye = landmarks[33]
-            const rightEye = landmarks[263]
-            const midX = (leftEye.x + rightEye.x) / 2
-            const midY = (leftEye.y + rightEye.y) / 2
-            const yaw = (noseTip.x - midX) * 120
-            const pitch = (noseTip.y - midY) * 120
-
-            const absYaw = Math.abs(yaw)
-            const absPitch = Math.abs(pitch)
-            const minAngle = 18
-            if (absPitch > minAngle && absPitch >= absYaw) {
-                direction = pitch < 0 ? 'up' : 'down'
-                confidence = 0.75
-            } else if (absYaw > minAngle) {
-                direction = yaw > 0 ? 'right' : 'left'
-                confidence = 0.75
-            }
+        if (avgY < yExtremeLow) {
+            direction = 'above-camera'
+        } else if (avgY < yLow && avgX < xLow) {
+            direction = 'top-left'
+        } else if (avgY < yLow && avgX > xHigh) {
+            direction = 'top-right'
+        } else if (avgY > yHigh && avgX < xLow) {
+            direction = 'bottom-left'
+        } else if (avgY > yHigh && avgX > xHigh) {
+            direction = 'bottom-right'
+        } else if (avgY < yLow) {
+            direction = 'up'
+        } else if (avgY > yHigh) {
+            direction = 'down'
+        } else if (avgX < xLow) {
+            direction = 'left'
+        } else if (avgX > xHigh) {
+            direction = 'right'
         }
 
         return { direction, confidence }
@@ -335,8 +330,78 @@ export default function CheatingDetector({ videoElement, roomId, enabled = true 
         }
     }, [config.enabled, roomId])
 
+    // Draw gaze indicators on canvas
+    const drawGaze = (results: any) => {
+        const canvas = canvasRef.current
+        if (!canvas || !results.multiFaceLandmarks || results.multiFaceLandmarks.length === 0) return
+
+        const ctx = canvas.getContext('2d')
+        if (!ctx) return
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height)
+
+        const landmarks = results.multiFaceLandmarks[0]
+
+        // Face bounding box (subtle)
+        let minX = 1, minY = 1, maxX = 0, maxY = 0
+        landmarks.forEach((p: any) => {
+            if (p.x < minX) minX = p.x
+            if (p.x > maxX) maxX = p.x
+            if (p.y < minY) minY = p.y
+            if (p.y > maxY) maxY = p.y
+        })
+
+        const w = canvas.width
+        const h = canvas.height
+
+        ctx.strokeStyle = getScoreColor()
+        ctx.lineWidth = 1
+        ctx.setLineDash([5, 5])
+        ctx.strokeRect(minX * w, minY * h, (maxX - minX) * w, (maxY - minY) * h)
+        ctx.setLineDash([])
+
+        // Gaze line for eyes
+        const drawEyeGaze = (irisIdx: number) => {
+            const iris = landmarks[irisIdx]
+            const eyeX = iris.x * w
+            const eyeY = iris.y * h
+
+            // Calculate relative offset for gaze vector
+            const gaze = calculateGazeDirection(landmarks)
+            if (gaze.direction === 'center') return
+
+            ctx.beginPath()
+            ctx.moveTo(eyeX, eyeY)
+
+            let dx = 0, dy = 0
+            const len = 30
+
+            if (gaze.direction.includes('left')) dx = -len
+            if (gaze.direction.includes('right')) dx = len
+            if (gaze.direction.includes('up') || gaze.direction.includes('camera')) dy = -len
+            if (gaze.direction.includes('down')) dy = len
+
+            ctx.lineTo(eyeX + dx, eyeY + dy)
+            ctx.strokeStyle = '#ef4444'
+            ctx.lineWidth = 2
+            ctx.stroke()
+
+            // Draw a dot at the iris
+            ctx.fillStyle = '#ef4444'
+            ctx.beginPath()
+            ctx.arc(eyeX, eyeY, 2, 0, 2 * Math.PI)
+            ctx.fill()
+        }
+
+        drawEyeGaze(468) // Left
+        drawEyeGaze(473) // Right
+    }
+
     // Analyze detection results and trigger alerts
     const analyzeDetection = (results: any) => {
+        // Draw visual indicators
+        drawGaze(results)
+
         if (!results.multiFaceLandmarks || results.multiFaceLandmarks.length === 0) {
             // No face detected
             setAttentionScore(0)
@@ -347,6 +412,11 @@ export default function CheatingDetector({ videoElement, roomId, enabled = true 
         const violations: string[] = []
         let score = 100
         const now = Date.now()
+
+        // Deduct for mobile phone
+        if (isPhoneDetectedRef.current) {
+            score -= 50
+        }
 
         // Check for multiple faces
         if (results.multiFaceLandmarks.length > 1) {
@@ -380,15 +450,30 @@ export default function CheatingDetector({ videoElement, roomId, enabled = true 
         if (isGazeAway) {
             if (!gazeAwayStartRef.current) gazeAwayStartRef.current = now
             const gazeAwayDuration = now - (gazeAwayStartRef.current ?? now)
-            // Show "Looking X" and drop score immediately so user gets instant feedback
-            violations.push(`Looking ${gaze.direction}`)
-            score -= 25
+
+            // Map internal direction to user-friendly messages
+            let displayMsg = 'Watching outside the window'
+            switch (gaze.direction) {
+                case 'above-camera': displayMsg = 'Looking ABOVE CAMERA'; break;
+                case 'up': displayMsg = 'Looking ABOVE WINDOW'; break;
+                case 'down': displayMsg = 'Looking BOTTOM (Outside Screen)'; break;
+                case 'left': displayMsg = 'Looking LEFT (Outside Window)'; break;
+                case 'right': displayMsg = 'Looking RIGHT (Outside Window)'; break;
+                case 'top-left': displayMsg = 'Looking TOP-LEFT Corner'; break;
+                case 'top-right': displayMsg = 'Looking TOP-RIGHT Corner'; break;
+                case 'bottom-left': displayMsg = 'Looking BOTTOM-LEFT Corner'; break;
+                case 'bottom-right': displayMsg = 'Looking BOTTOM-RIGHT Corner'; break;
+            }
+
+            violations.push(displayMsg)
+            score -= (gaze.direction === 'above-camera' ? 40 : 25)
+
             // Log to DB only after sustained gaze away (throttled)
             if (gazeAwayDuration > config.gazeAwayThreshold &&
                 (!lastAlertTimeRef.current['eyes_away'] || now - lastAlertTimeRef.current['eyes_away'] > 5000)) {
                 saveDetectionEvent({
                     type: 'eyes_away',
-                    severity: 'medium',
+                    severity: gaze.direction === 'above-camera' ? 'high' : 'medium',
                     confidence: gaze.confidence,
                     timestamp: now,
                 })
@@ -404,7 +489,8 @@ export default function CheatingDetector({ videoElement, roomId, enabled = true 
             if (!headTurnStartRef.current) headTurnStartRef.current = now
             const headAwayDuration = now - (headTurnStartRef.current ?? now)
             if (headAwayDuration > 1500) {
-                violations.push('Head turned away')
+                const headDir = headPose.yaw > 0 ? 'RIGHT' : 'LEFT'
+                violations.push(`Watching outside the window (${headDir})`)
                 score -= 30
                 if (!lastAlertTimeRef.current['head_turned'] || now - lastAlertTimeRef.current['head_turned'] > 5000) {
                     saveDetectionEvent({
@@ -422,7 +508,13 @@ export default function CheatingDetector({ videoElement, roomId, enabled = true 
 
         // Update attention score
         setAttentionScore(Math.max(0, score))
-        setCurrentViolations(violations)
+
+        // Add mobile phone violation if currently detected
+        if (isPhoneDetectedRef.current) {
+            violations.push('Mobile phone detected')
+        }
+
+        setCurrentViolations(Array.from(new Set(violations)))
 
         // Check for low attention
         if (score < config.attentionScoreThreshold) {
@@ -441,7 +533,7 @@ export default function CheatingDetector({ videoElement, roomId, enabled = true 
         }
     }
 
-    // Initialize MediaPipe Face Mesh
+    // Initialize MediaPipe Face Mesh AND Object Detection
     useEffect(() => {
         if (!config.enabled || !videoElement || !canvasRef.current) {
             console.log('[CheatingDetector] Not initializing:', {
@@ -453,6 +545,21 @@ export default function CheatingDetector({ videoElement, roomId, enabled = true 
         }
 
         console.log('[CheatingDetector] Initializing for room:', roomId)
+
+        // Load COCO-SSD for mobile detection
+        const loadMobileModel = async () => {
+            try {
+                if ((window as any).cocoSsd) {
+                    mobileModelRef.current = await (window as any).cocoSsd.load()
+                    console.log('[CheatingDetector] COCO-SSD loaded')
+                } else {
+                    console.warn('[CheatingDetector] cocoSsd not found on window')
+                }
+            } catch (err) {
+                console.error('[CheatingDetector] Failed to load COCO-SSD:', err)
+            }
+        }
+        loadMobileModel()
 
         const faceMesh = new FaceMesh({
             locateFile: (file) => {
@@ -473,11 +580,47 @@ export default function CheatingDetector({ videoElement, roomId, enabled = true 
 
         faceMeshRef.current = faceMesh
 
+        // Detection throttle for mobile phone
+        let lastMobileDetection = 0
+
         // Start camera
         const camera = new Camera(videoElement, {
             onFrame: async () => {
                 if (faceMeshRef.current) {
                     await faceMeshRef.current.send({ image: videoElement })
+                }
+
+                // Check for mobile phone every 1.5 seconds to save resources
+                const now = Date.now()
+                if (mobileModelRef.current && now - lastMobileDetection > 1500) {
+                    lastMobileDetection = now
+                    try {
+                        const predictions = await mobileModelRef.current.detect(videoElement)
+                        const phone = predictions.find((p: any) =>
+                            (p.class === 'cell phone' || p.class === 'phone') && p.score > 0.6
+                        )
+
+                        if (phone) {
+                            console.log('[CheatingDetector] Mobile phone detected!', phone)
+                            isPhoneDetectedRef.current = true
+                            setAttentionScore(prev => Math.max(0, prev - 50))
+
+                            if (!lastAlertTimeRef.current['mobile_phone'] ||
+                                now - lastAlertTimeRef.current['mobile_phone'] > 10000) {
+                                saveDetectionEvent({
+                                    type: 'mobile_phone',
+                                    severity: 'high',
+                                    confidence: phone.score,
+                                    timestamp: now
+                                })
+                                lastAlertTimeRef.current['mobile_phone'] = now
+                            }
+                        } else {
+                            isPhoneDetectedRef.current = false
+                        }
+                    } catch (err) {
+                        console.error('[CheatingDetector] Mobile detection error:', err)
+                    }
                 }
             },
             width: 640,
@@ -502,30 +645,38 @@ export default function CheatingDetector({ videoElement, roomId, enabled = true 
         return '#f44336'
     }
 
-    const getStatusText = () => {
-        if (!isDetecting) return 'Initializing...'
-        if (currentViolations.length === 0) return 'Monitoring'
-        return currentViolations.join(', ')
-    }
 
     // Always render canvas for MediaPipe, but only show UI if enabled
     return (
         <>
-            <canvas ref={canvasRef} style={{ display: 'none' }} />
-
             {config.enabled && (
                 <div className="cheating-detector-overlay">
+                    <canvas
+                        ref={canvasRef}
+                        className="gaze-canvas"
+                        width={640}
+                        height={480}
+                    />
+
                     <div className="detection-status">
                         <div
                             className="attention-indicator"
-                            style={{ backgroundColor: getScoreColor() }}
+                            style={{ '--score-color': getScoreColor() } as any}
                         >
                             <span className="attention-score">{attentionScore}</span>
+                            <span className="attention-label">Score</span>
                         </div>
                         <div className="status-text">
-                            <span className={currentViolations.length > 0 ? 'warning' : ''}>
-                                {getStatusText()}
-                            </span>
+                            {currentViolations.length > 0 ? (
+                                <span className="warning">
+                                    {currentViolations[0]}
+                                </span>
+                            ) : (
+                                <div className="monitoring-label">
+                                    <div className="monitoring-dot" />
+                                    <span>Monitoring Active</span>
+                                </div>
+                            )}
                         </div>
                     </div>
 

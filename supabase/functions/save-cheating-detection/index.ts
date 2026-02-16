@@ -39,7 +39,7 @@ serve(async (req) => {
             'mouse_leave',
             'copy_paste',
             'suspicious_audio',
-            'multiple_voices'
+            'multiple_voices',
         ]
         if (!validViolationTypes.includes(violationType)) {
             return new Response(
