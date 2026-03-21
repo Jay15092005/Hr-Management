@@ -9,6 +9,7 @@ import {
   type InterviewConfiguration,
 } from '../lib/supabase'
 import InterviewScheduler from './InterviewScheduler'
+import ResumeFileLink from './ResumeFileLink'
 import { sendSelectionEmail } from '../utils/email'
 import './CandidateDetail.css'
 
@@ -458,18 +459,9 @@ export default function CandidateDetail() {
           )}
           <dt>Resume</dt>
           <dd>
-            {resume.resume_file_url ? (
-              <a
-                href={resume.resume_file_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="link-resume"
-              >
-                View / Download resume
-              </a>
-            ) : (
-              '—'
-            )}
+            <ResumeFileLink resume={resume} className="link-resume">
+              View / Download resume
+            </ResumeFileLink>
           </dd>
         </dl>
       </section>

@@ -1,5 +1,12 @@
 import { useState } from 'react'
-import { supabase, type Resume, type JobDescription, type ResumeScore } from '../lib/supabase'
+import {
+  getResumeReadableUrl,
+  resumeHasDownloadableFile,
+  supabase,
+  type Resume,
+  type JobDescription,
+  type ResumeScore,
+} from '../lib/supabase'
 import { getGeminiService } from '../lib/gemini'
 import { extractResumeTextFromUrl } from '../utils/resumeParser'
 import './AIScoring.css'
@@ -21,7 +28,7 @@ export default function AIScoring({ resumes, jobDescription, compact = false }: 
       return
     }
 
-    if (!resume.resume_file_url) {
+    if (!resumeHasDownloadableFile(resume)) {
       alert('Resume file not available')
       return
     }
@@ -47,7 +54,9 @@ export default function AIScoring({ resumes, jobDescription, compact = false }: 
       // Extract text from resume (PDF, DOCX, TXT)
       let resumeText = ''
       try {
-        resumeText = await extractResumeTextFromUrl(resume.resume_file_url)
+        const fileUrl = await getResumeReadableUrl(resume)
+        if (!fileUrl) throw new Error('Could not resolve resume file URL')
+        resumeText = await extractResumeTextFromUrl(fileUrl)
       } catch (err) {
         console.warn('Could not extract text from resume file, using basic info:', err)
         // Fallback to basic candidate info if extraction fails
@@ -132,7 +141,7 @@ export default function AIScoring({ resumes, jobDescription, compact = false }: 
     // Evaluate resumes one at a time with delays to avoid overload
     for (let i = 0; i < resumes.length; i++) {
       const resume = resumes[i]
-      if (resume.resume_file_url) {
+      if (resumeHasDownloadableFile(resume)) {
         await evaluateResume(resume)
         // Longer delay between evaluations to avoid overload (3 seconds)
         if (i < resumes.length - 1) {
@@ -186,7 +195,7 @@ export default function AIScoring({ resumes, jobDescription, compact = false }: 
                     type="button"
                     className="btn-eval-one"
                     onClick={() => evaluateResume(resume)}
-                    disabled={!resume.resume_file_url || evaluating !== null}
+                    disabled={!resumeHasDownloadableFile(resume) || evaluating !== null}
                   >
                     {isEvaluating ? '...' : 'Evaluate'}
                   </button>
@@ -295,7 +304,7 @@ export default function AIScoring({ resumes, jobDescription, compact = false }: 
                       <button
                         onClick={() => evaluateResume(resume)}
                         className="btn-evaluate"
-                        disabled={!resume.resume_file_url || evaluating !== null}
+                        disabled={!resumeHasDownloadableFile(resume) || evaluating !== null}
                       >
                         Evaluate Resume
                       </button>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { supabase } from '../lib/supabase'
+import { getResumeReadableUrl, supabase } from '../lib/supabase'
 import './PipelineDetail.css'
 
 /* ── helpers ── */
@@ -130,6 +130,7 @@ export default function PipelineDetail() {
           resumes!inner (
             id, name, email, location, degree,
             years_of_experience, resume_file_url, resume_file_name,
+            storage_object_path,
             date_of_application
           ),
           job_descriptions!inner (
@@ -159,6 +160,11 @@ export default function PipelineDetail() {
         .eq('candidate_selection_id', selectionId!)
         .maybeSingle()
 
+      const resumeUrl = await getResumeReadableUrl({
+        storage_object_path: resume.storage_object_path,
+        resume_file_url: resume.resume_file_url,
+      })
+
       setData({
         resumeId: resume.id,
         name: resume.name,
@@ -166,7 +172,7 @@ export default function PipelineDetail() {
         location: resume.location,
         degree: resume.degree,
         yearsExp: resume.years_of_experience,
-        resumeUrl: resume.resume_file_url,
+        resumeUrl,
         resumeFileName: resume.resume_file_name,
         appliedAt: resume.date_of_application,
         jobId: job.id,

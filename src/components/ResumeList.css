@@ -98,6 +98,11 @@
   color: #666;
 }
 
+.role-cell {
+  color: #444;
+  font-size: 0.9rem;
+}
+
 .date-cell {
   color: #666;
   font-size: 0.9rem;

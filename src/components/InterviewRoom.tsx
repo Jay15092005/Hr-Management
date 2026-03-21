@@ -223,41 +223,32 @@ function MeetingView({ roomId, candidateName, onLeave }: InterviewRoomProps) {
   useEffect(() => {
     const validateRoom = async () => {
       try {
-        // First check if interview exists in database
-        const { data: interviewConfig, error: dbError } = await supabase
-          .from('interview_configurations')
-          .select('status, room_id')
-          .eq('room_id', roomId)
-          .single()
+        const { data, error: dbError } = await supabase.rpc('interview_join_context', {
+          p_room_id: roomId,
+        })
 
-        if (dbError || !interviewConfig) {
+        if (dbError || data == null) {
           console.error('Interview not found in database:', dbError)
           setRoomValid(false)
           setError('Interview room not found. Please check the link and try again.')
           return
         }
 
-        // For instant interviews (status: 'active'), allow joining immediately
+        const interviewConfig = data as { status?: string; room_id?: string | null }
         if (interviewConfig.status === 'active') {
           console.log('Instant interview found - allowing join')
           setRoomValid(true)
           return
         }
 
-        // For scheduled interviews, check if it's time
         if (interviewConfig.status === 'scheduled') {
-          // Allow joining - VideoSDK SDK will handle connection
-          // The room might be created 5 minutes before, so allow joining
           setRoomValid(true)
           return
         }
 
-        // For other statuses, allow joining - let VideoSDK SDK handle it
         setRoomValid(true)
       } catch (err) {
         console.error('Error validating room:', err)
-        // If validation fails but we have roomId, allow joining anyway
-        // VideoSDK SDK will handle connection errors
         setRoomValid(true)
       }
     }
@@ -316,12 +307,11 @@ function MeetingView({ roomId, candidateName, onLeave }: InterviewRoomProps) {
       ; (async () => {
         try {
           console.log('[InterviewRoom] Marking interview completed for room', roomId)
-          const { error: updateError } = await supabase
-            .from('interview_configurations')
-            .update({ status: 'completed', updated_at: new Date().toISOString() })
-            .eq('room_id', roomId)
-          if (updateError) {
-            console.error('[InterviewRoom] Failed to mark interview completed:', updateError)
+          const { error: rpcError } = await supabase.rpc('complete_interview_by_room', {
+            p_room_id: roomId,
+          })
+          if (rpcError) {
+            console.error('[InterviewRoom] Failed to mark interview completed:', rpcError)
           }
         } catch (e) {
           console.error('[InterviewRoom] Exception while marking interview completed:', e)

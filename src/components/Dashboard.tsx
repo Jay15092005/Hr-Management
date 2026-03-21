@@ -1,14 +1,16 @@
 import { useState, useEffect } from 'react'
-import { useOutletContext, useLocation } from 'react-router-dom'
+import { useOutletContext, useLocation, useNavigate } from 'react-router-dom'
+import { useAuth } from '../contexts/AuthContext'
 import type { WorkflowContext } from '../App'
 import UploadResume from './UploadResume'
 import ResumeList from './ResumeList'
 import HRWorkflow from './HRWorkflow'
 import JobDescriptionManager from './JobDescription'
 import MeetingOverview from './MeetingOverview'
+import ApplicationLinksManager from './ApplicationLinksManager'
 import './Dashboard.css'
 
-type Section = 'upload' | 'list' | 'description' | 'workflow' | 'meetings'
+type Section = 'upload' | 'list' | 'description' | 'workflow' | 'meetings' | 'forms'
 
 function getDateDisplay() {
   const d = new Date()
@@ -26,6 +28,13 @@ export default function Dashboard() {
   const [refreshKey, setRefreshKey] = useState(0)
   const workflowContext = useOutletContext<WorkflowContext>()
   const location = useLocation()
+  const { user, signOut } = useAuth()
+  const navigate = useNavigate()
+
+  const handleSignOut = async () => {
+    await signOut()
+    navigate('/login', { replace: true })
+  }
 
   useEffect(() => {
     const s = location.state?.section
@@ -41,15 +50,18 @@ export default function Dashboard() {
   return (
     <div className="dashboard-container">
       <header className="dashboard-header-bar">
-        <div className="header-date">{getDateDisplay()}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', flexWrap: 'wrap' }}>
+          <div className="header-date">{getDateDisplay()}</div>
+          <div className="dashboard-user-bar" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <span style={{ fontSize: '0.85rem', color: '#555' }} title={user?.email ?? ''}>
+              {user?.email ?? 'HR'}
+            </span>
+            <button type="button" className="nav-btn" onClick={handleSignOut} style={{ fontSize: '0.85rem' }}>
+              Sign out
+            </button>
+          </div>
+        </div>
         <nav className="dashboard-nav">
-          <button
-            className={`nav-btn ${activeSection === 'upload' ? 'active' : ''}`}
-            onClick={() => setActiveSection('upload')}
-          >
-            <span className="nav-icon">📄</span>
-            Upload Resume New
-          </button>
           <button
             className={`nav-btn ${activeSection === 'list' ? 'active' : ''}`}
             onClick={() => setActiveSection('list')}
@@ -77,6 +89,13 @@ export default function Dashboard() {
           >
             <span className="nav-icon">📋</span>
             Meeting Details
+          </button>
+          <button
+            className={`nav-btn ${activeSection === 'forms' ? 'active' : ''}`}
+            onClick={() => setActiveSection('forms')}
+          >
+            <span className="nav-icon">🔗</span>
+            Form Links
           </button>
         </nav>
       </header>
@@ -114,6 +133,12 @@ export default function Dashboard() {
         {activeSection === 'meetings' && (
           <div className="dashboard-section">
             <MeetingOverview />
+          </div>
+        )}
+
+        {activeSection === 'forms' && (
+          <div className="dashboard-section">
+            <ApplicationLinksManager />
           </div>
         )}
       </div>
