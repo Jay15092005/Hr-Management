@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { FaceMesh } from '@mediapipe/face_mesh'
 import { Camera } from '@mediapipe/camera_utils'
+import * as cocoSsd from '@tensorflow-models/coco-ssd'
+import '@tensorflow/tfjs'
 import { supabase } from '../lib/supabase'
 import './CheatingDetector.css'
 
@@ -21,6 +23,7 @@ type ViolationType =
     | 'copy_paste'
     | 'suspicious_audio'
     | 'multiple_voices'
+    | 'mobile_phone'
 
 interface DetectionEvent {
     type: ViolationType
@@ -76,13 +79,20 @@ export default function CheatingDetector({ videoElement, roomId, enabled = true 
     const [currentViolations, setCurrentViolations] = useState<string[]>([])
     const [gazeDirection, setGazeDirection] = useState<GazeDirection>('center')
     const [isDetecting, setIsDetecting] = useState(false)
+    const [mobileDetected, setMobileDetected] = useState(false)
     const canvasRef = useRef<HTMLCanvasElement>(null)
     const faceMeshRef = useRef<FaceMesh | null>(null)
     const cameraRef = useRef<Camera | null>(null)
     const detectionHistoryRef = useRef<DetectionEvent[]>([])
     const lastAlertTimeRef = useRef<{ [key: string]: number }>({})
-    const mobileModelRef = useRef<any>(null)
+    const mobileModelRef = useRef<cocoSsd.ObjectDetection | null>(null)
     const isPhoneDetectedRef = useRef<boolean>(false)
+    // Store last phone bounding box for canvas drawing
+    const phoneBBoxRef = useRef<{ x: number; y: number; width: number; height: number; score: number } | null>(null)
+    // Timestamp of last confirmed phone sighting (for persistence / debounce)
+    const phoneLastSeenRef = useRef<number>(0)
+    // How long (ms) to keep alert visible after phone disappears from frame
+    const PHONE_PERSIST_MS = 2000
 
     // Tracking start times for sustained violations → DB logging
     const gazeAwayStartRef = useRef<number | null>(null)
@@ -513,6 +523,50 @@ export default function CheatingDetector({ videoElement, roomId, enabled = true 
         }
     }
 
+    // ─── Draw phone bounding box on canvas ────────────────────────────────────
+    const drawPhoneBox = () => {
+        const canvas = canvasRef.current
+        if (!canvas || !phoneBBoxRef.current) return
+        const ctx = canvas.getContext('2d')
+        if (!ctx) return
+
+        const bbox = phoneBBoxRef.current
+        // COCO-SSD bbox is pixel-based on the video element; scale to canvas size
+        const scaleX = canvas.width / (videoElement?.videoWidth || canvas.width)
+        const scaleY = canvas.height / (videoElement?.videoHeight || canvas.height)
+
+        const x = bbox.x * scaleX
+        const y = bbox.y * scaleY
+        const w = bbox.width * scaleX
+        const h = bbox.height * scaleY
+        const confidence = Math.round(bbox.score * 100)
+
+        // Glowing red box
+        ctx.save()
+        ctx.shadowColor = '#ef4444'
+        ctx.shadowBlur = 12
+        ctx.strokeStyle = '#ef4444'
+        ctx.lineWidth = 3
+        ctx.setLineDash([])
+        ctx.strokeRect(x, y, w, h)
+        ctx.restore()
+
+        // Label background
+        const label = `📱 Mobile Phone ${confidence}%`
+        ctx.font = 'bold 13px Inter, sans-serif'
+        const tm = ctx.measureText(label)
+        const labelH = 22
+        const labelY = y > labelH + 4 ? y - labelH - 4 : y + h + 4
+        ctx.fillStyle = 'rgba(239, 68, 68, 0.92)'
+        ctx.beginPath()
+        ;(ctx as any).roundRect?.(x, labelY, tm.width + 16, labelH, 4)
+        ctx.fill()
+
+        ctx.fillStyle = '#ffffff'
+        ctx.textAlign = 'left'
+        ctx.fillText(label, x + 8, labelY + 15)
+    }
+
     // ─── Main face analysis ──────────────────────────────────────────────────
     const analyzeDetection = (results: any) => {
         if (!results.multiFaceLandmarks || results.multiFaceLandmarks.length === 0) {
@@ -635,13 +689,11 @@ export default function CheatingDetector({ videoElement, roomId, enabled = true 
 
         console.log('[CheatingDetector] Initializing for room:', roomId)
 
-        // COCO-SSD for mobile detection
+        // COCO-SSD for mobile phone detection (loaded from npm package)
         const loadMobileModel = async () => {
             try {
-                if ((window as any).cocoSsd) {
-                    mobileModelRef.current = await (window as any).cocoSsd.load()
-                    console.log('[CheatingDetector] COCO-SSD loaded')
-                }
+                mobileModelRef.current = await cocoSsd.load()
+                console.log('[CheatingDetector] COCO-SSD model loaded successfully')
             } catch (err) {
                 console.error('[CheatingDetector] Failed to load COCO-SSD:', err)
             }
@@ -674,21 +726,48 @@ export default function CheatingDetector({ videoElement, roomId, enabled = true 
                 }
 
                 const now = Date.now()
-                if (mobileModelRef.current && now - lastMobileDetection > 1500) {
+                // Run mobile detection every 800ms for snappier response
+                if (mobileModelRef.current && now - lastMobileDetection > 800) {
                     lastMobileDetection = now
                     try {
-                        const predictions = await mobileModelRef.current.detect(videoElement)
-                        const phone = predictions.find((p: any) =>
-                            (p.class === 'cell phone' || p.class === 'phone') && p.score > 0.6
-                        )
+                        // maxNumBoxes:20 ensures partial/overlapping detections are not dropped
+                        const predictions = await mobileModelRef.current.detect(videoElement, 20)
+
+                        // Collect all phone-like predictions sorted by score descending
+                        // Threshold: 0.20 — catches even partially visible phones
+                        const PHONE_CLASSES = ['cell phone', 'phone', 'remote']
+                        const phoneHits = predictions
+                            .filter((p) => PHONE_CLASSES.includes(p.class) && p.score > 0.20)
+                            .sort((a, b) => b.score - a.score)
+
+                        const phone = phoneHits[0] ?? null
+
                         if (phone) {
+                            // Phone seen — update last-seen timestamp and bbox
+                            phoneLastSeenRef.current = now
                             isPhoneDetectedRef.current = true
+                            phoneBBoxRef.current = {
+                                x: phone.bbox[0],
+                                y: phone.bbox[1],
+                                width: phone.bbox[2],
+                                height: phone.bbox[3],
+                                score: phone.score,
+                            }
+                            setMobileDetected(true)
                             if (!lastAlertTimeRef.current['mobile_phone'] || now - lastAlertTimeRef.current['mobile_phone'] > 10000) {
-                                saveDetectionEvent({ type: 'mobile_phone' as any, severity: 'high', confidence: phone.score, timestamp: now })
+                                saveDetectionEvent({ type: 'mobile_phone', severity: 'high', confidence: phone.score, timestamp: now })
                                 lastAlertTimeRef.current['mobile_phone'] = now
                             }
+                            drawPhoneBox()
+                            console.log(`[CheatingDetector] 📱 Phone detected: ${phone.class} @ ${Math.round(phone.score * 100)}% confidence`)
                         } else {
-                            isPhoneDetectedRef.current = false
+                            // No detection this frame — only clear after PHONE_PERSIST_MS grace period
+                            if (now - phoneLastSeenRef.current > PHONE_PERSIST_MS) {
+                                isPhoneDetectedRef.current = false
+                                phoneBBoxRef.current = null
+                                setMobileDetected(false)
+                            }
+                            // else: keep the alert visible during the grace period
                         }
                     } catch (err) {
                         console.error('[CheatingDetector] Mobile detection error:', err)
@@ -772,8 +851,16 @@ export default function CheatingDetector({ videoElement, roomId, enabled = true 
                         <div className="gaze-compass-label">Eye Gaze</div>
                     </div>
 
+                    {/* ── Mobile phone alert banner ── */}
+                    {mobileDetected && (
+                        <div className="violation-alert violation-alert--mobile">
+                            <span className="alert-icon">📱</span>
+                            <span className="alert-text">Mobile Phone Detected!</span>
+                        </div>
+                    )}
+
                     {/* ── Violation alert banner ── */}
-                    {currentViolations.length > 0 && (
+                    {currentViolations.length > 0 && !mobileDetected && (
                         <div className="violation-alert">
                             <span className="alert-icon">{gazeCfg.emoji}</span>
                             <span className="alert-text">{currentViolations[0]}</span>
