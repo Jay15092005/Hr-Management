@@ -1,197 +1,91 @@
-.hr-workflow-container {
-  padding: 0;
-}
-
 .hr-workflow-container.simple-layout {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
-}
-
-.workflow-section-block {
-  background: white;
-  border-radius: 8px;
-  padding: 1.25rem;
-  border: 1px solid #eee;
-}
-
-.workflow-section-block .section-title {
-  margin: 0 0 0.75rem 0;
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: #1a1a1a;
-}
-
-.workflow-hint {
-  font-size: 0.9rem;
-  color: #666;
-  padding: 1rem;
-  background: #f9f9f9;
-  border-radius: 6px;
-}
-
-.workflow-header {
-  text-align: center;
-  margin-bottom: 2rem;
-}
-
-.workflow-header h1 {
-  font-size: 2rem;
-  font-weight: 700;
-  color: #1a1a1a;
-  margin: 0 0 0.5rem 0;
-}
-
-.workflow-subtitle {
-  color: #666;
-  font-size: 1rem;
-  margin: 0;
-}
-
-.workflow-navigation {
-  margin-top: 2rem;
-  text-align: center;
-}
-
-.workflow-steps {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 3rem;
-  gap: 1rem;
-}
-
-.step-indicator {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 1rem 2rem;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  cursor: pointer;
-  transition: all 0.2s;
-  border: 2px solid transparent;
-}
-
-.step-indicator:hover {
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-}
-
-.step-indicator.active {
-  border-color: #1976d2;
-  background: #f0f7ff;
-}
-
-.step-number {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: #e0e0e0;
-  color: #666;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 600;
-  font-size: 1.1rem;
-  transition: all 0.2s;
-}
-
-.step-indicator.active .step-number {
-  background: #1976d2;
-  color: white;
-}
-
-.step-label {
-  font-weight: 500;
-  color: #666;
-  font-size: 0.95rem;
-}
-
-.step-indicator.active .step-label {
-  color: #1976d2;
-  font-weight: 600;
-}
-
-.step-connector {
-  width: 60px;
-  height: 2px;
-  background: #e0e0e0;
-}
-
-.workflow-content {
-  max-width: 1400px;
+  gap: 2rem;
+  max-width: 1200px;
   margin: 0 auto;
 }
 
-.workflow-section {
-  display: flex;
-  flex-direction: column;
-  gap: 2rem;
-}
-
-.filter-results {
-  background: white;
-  border-radius: 12px;
+.workflow-section-block {
+  background: var(--card-bg);
+  backdrop-filter: blur(8px);
+  border-radius: var(--radius-lg);
   padding: 2rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  text-align: center;
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-md);
+  transition: var(--transition-normal);
 }
 
-.filter-results h3 {
+.workflow-section-block:hover {
+  box-shadow: var(--shadow-lg);
+  border-color: var(--primary-light);
+}
+
+.workflow-section-block .section-title {
   margin: 0 0 1.5rem 0;
-  font-size: 1.5rem;
-  color: #1a1a1a;
+  font-size: 1.25rem;
+  font-family: 'Outfit', sans-serif;
+  font-weight: 700;
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
 }
 
-.evaluation-setup {
-  margin-bottom: 2rem;
+.workflow-section-block .section-title::before {
+  content: '';
+  width: 4px;
+  height: 1.25rem;
+  background: var(--primary);
+  border-radius: 2px;
 }
 
-.evaluation-results {
-  margin-top: 2rem;
-}
-
-.info-box {
-  background: #e3f2fd;
-  color: #1976d2;
-  padding: 2rem;
-  border-radius: 12px;
+.workflow-hint {
+  font-size: 0.95rem;
+  color: var(--text-muted);
+  padding: 1.5rem;
+  background: var(--primary-light);
+  border-radius: var(--radius-md);
+  border: 1px dashed var(--primary);
   text-align: center;
-  font-size: 1rem;
+  margin-top: 1rem;
 }
 
-.btn-primary {
-  padding: 0.875rem 2rem;
-  background: #1976d2;
+/* Candidates Table Section specifically */
+.workflow-section-block:has(table) {
+  padding: 1rem 0; /* Let the table handle its own internal padding if needed */
+  overflow: hidden;
+}
+
+/* Transitions for dynamic content */
+.workflow-section-block {
+  animation: slideUpFade 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes slideUpFade {
+  from { opacity: 0; transform: translateY(15px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Step indicators (if used) */
+.step-indicator {
+  background: white;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border-color);
+}
+
+.step-indicator.active {
+  background: var(--primary-light);
+  border-color: var(--primary);
+}
+
+.step-number {
+  background: var(--bg-main);
+  color: var(--text-muted);
+}
+
+.step-indicator.active .step-number {
+  background: var(--primary);
   color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 1rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: #1565c0;
-}
-
-@media (max-width: 768px) {
-  .workflow-steps {
-    flex-direction: column;
-    gap: 0.5rem;
-  }
-
-  .step-connector {
-    width: 2px;
-    height: 40px;
-  }
-
-  .step-indicator {
-    width: 100%;
-    flex-direction: row;
-    justify-content: flex-start;
-  }
 }
