@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { supabase } from '../lib/supabase'
+import { getResumeReadableUrl, supabase } from '../lib/supabase'
 import './PipelineDetail.css'
 
 /* ── helpers ── */
@@ -25,6 +25,15 @@ function fmtDateTime(iso: string | null | undefined): string {
 }
 
 /* ── types ── */
+type DetectionRow = {
+  id: string
+  violation_type: string
+  severity: string
+  confidence: number
+  created_at: string
+  metadata?: { attentionScore?: number }
+}
+
 interface PageData {
   /* candidate */
   resumeId: string
@@ -101,6 +110,7 @@ export default function PipelineDetail() {
   const [actionMessage, setActionMessage] = useState<string | null>(null)
   const [resetLoading, setResetLoading] = useState(false)
   const [instantLoading, setInstantLoading] = useState(false)
+  const [detections, setDetections] = useState<DetectionRow[]>([])
 
   useEffect(() => {
     if (!selectionId) return
@@ -120,6 +130,7 @@ export default function PipelineDetail() {
           resumes!inner (
             id, name, email, location, degree,
             years_of_experience, resume_file_url, resume_file_name,
+            storage_object_path,
             date_of_application
           ),
           job_descriptions!inner (
@@ -149,6 +160,11 @@ export default function PipelineDetail() {
         .eq('candidate_selection_id', selectionId!)
         .maybeSingle()
 
+      const resumeUrl = await getResumeReadableUrl({
+        storage_object_path: resume.storage_object_path,
+        resume_file_url: resume.resume_file_url,
+      })
+
       setData({
         resumeId: resume.id,
         name: resume.name,
@@ -156,7 +172,7 @@ export default function PipelineDetail() {
         location: resume.location,
         degree: resume.degree,
         yearsExp: resume.years_of_experience,
-        resumeUrl: resume.resume_file_url,
+        resumeUrl,
         resumeFileName: resume.resume_file_name,
         appliedAt: resume.date_of_application,
         jobId: job.id,
@@ -188,6 +204,17 @@ export default function PipelineDetail() {
         joinLinkSentAt: iv?.join_link_sent_at ?? null,
         interviewCreatedAt: iv?.created_at ?? null,
       })
+
+      if (iv?.id) {
+        const { data: detData } = await supabase
+          .from('cheating_detections')
+          .select('id, violation_type, severity, confidence, created_at, metadata')
+          .eq('interview_id', iv.id)
+          .order('created_at', { ascending: false })
+        setDetections((detData ?? []) as DetectionRow[])
+      } else {
+        setDetections([])
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to load')
     } finally {
@@ -510,6 +537,65 @@ export default function PipelineDetail() {
                 </button>
               </div>
             )}
+
+            {/* Cheating detection (always show so user sees where it will appear) */}
+            <div className="pd-cheating-section">
+              <h3 className="pd-card-title" style={{ marginTop: '1rem', marginBottom: '0.5rem' }}>
+                🛡️ Cheating detection
+              </h3>
+              {!data.interviewId ? (
+                <p className="pd-muted">
+                  No interview yet. Detection events (gaze away, head turn, tab switch, etc.) will appear here after the candidate joins and completes an interview.
+                </p>
+              ) : detections.length === 0 ? (
+                <p className="pd-muted">No detection events for this interview yet.</p>
+              ) : (
+                <>
+                  <p className="pd-muted">
+                    {detections.length} event{detections.length !== 1 ? 's' : ''} recorded.
+                  </p>
+                  <div className="pd-detections-pills">
+                    {['eyes_away', 'head_turned', 'multiple_faces', 'low_attention', 'tab_switch', 'copy_paste', 'fullscreen_exit', 'mouse_leave'].map(
+                      (type) => {
+                        const count = detections.filter((d) => d.violation_type === type).length
+                        if (count === 0) return null
+                        return (
+                          <span key={type} className="pd-detection-pill">
+                            {type.replace(/_/g, ' ')}: {count}
+                          </span>
+                        )
+                      }
+                    )}
+                  </div>
+                  <table className="pd-detections-table">
+                    <thead>
+                      <tr>
+                        <th>Time</th>
+                        <th>Type</th>
+                        <th>Severity</th>
+                        <th>Confidence</th>
+                        {detections.some((d) => d.metadata?.attentionScore != null) && <th>Score</th>}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {detections.map((d) => (
+                        <tr key={d.id}>
+                          <td>{fmtDateTime(d.created_at)}</td>
+                          <td>{d.violation_type.replace(/_/g, ' ')}</td>
+                          <td>
+                            <span className={`pd-severity pd-severity-${d.severity}`}>{d.severity}</span>
+                          </td>
+                          <td>{Math.round(d.confidence * 100)}%</td>
+                          {detections.some((x) => x.metadata?.attentionScore != null) && (
+                            <td>{d.metadata?.attentionScore ?? '—'}</td>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </>
+              )}
+            </div>
 
             {data.selectionStatus === 'selected' && (
               <div className="pd-interview-actions">

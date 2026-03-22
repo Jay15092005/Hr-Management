@@ -1,0 +1,141 @@
+---
+description: 
+alwaysApply: true
+---
+
+-- WARNING: This schema is for context only and is not meant to be run.
+-- Table order and constraints may not be valid for execution.
+
+CREATE TABLE public.candidate_selections (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  resume_id uuid NOT NULL,
+  job_description_id uuid NOT NULL,
+  status character varying NOT NULL CHECK (status::text = ANY (ARRAY['pending'::character varying, 'selected'::character varying, 'rejected'::character varying]::text[])),
+  selected_at timestamp with time zone,
+  rejected_at timestamp with time zone,
+  email_sent boolean DEFAULT false,
+  email_sent_at timestamp with time zone,
+  notes text,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  interview_scheduled boolean DEFAULT false,
+  CONSTRAINT candidate_selections_pkey PRIMARY KEY (id),
+  CONSTRAINT candidate_selections_resume_id_fkey FOREIGN KEY (resume_id) REFERENCES public.resumes(id),
+  CONSTRAINT candidate_selections_job_description_id_fkey FOREIGN KEY (job_description_id) REFERENCES public.job_descriptions(id)
+);
+CREATE TABLE public.cheating_detections (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  interview_id uuid,
+  room_id text NOT NULL,
+  timestamp timestamp with time zone NOT NULL DEFAULT now(),
+  violation_type text NOT NULL CHECK (violation_type = ANY (ARRAY['eyes_away'::text, 'multiple_faces'::text, 'head_turned'::text, 'low_attention'::text, 'tab_switch'::text, 'fullscreen_exit'::text, 'mouse_leave'::text, 'copy_paste'::text, 'suspicious_audio'::text, 'multiple_voices'::text])),
+  severity text NOT NULL CHECK (severity = ANY (ARRAY['low'::text, 'medium'::text, 'high'::text])),
+  confidence double precision NOT NULL CHECK (confidence >= 0::double precision AND confidence <= 1::double precision),
+  metadata jsonb,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT cheating_detections_pkey PRIMARY KEY (id),
+  CONSTRAINT cheating_detections_interview_id_fkey FOREIGN KEY (interview_id) REFERENCES public.interview_configurations(id)
+);
+CREATE TABLE public.interview_configurations (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  candidate_selection_id uuid NOT NULL,
+  interview_type character varying NOT NULL,
+  difficulty_level character varying NOT NULL CHECK (difficulty_level::text = ANY (ARRAY['Easy'::character varying, 'Medium'::character varying, 'Hard'::character varying]::text[])),
+  duration_minutes integer NOT NULL CHECK (duration_minutes > 0),
+  coding_round boolean DEFAULT false,
+  scheduled_at timestamp with time zone NOT NULL,
+  room_id character varying,
+  room_created_at timestamp with time zone,
+  status character varying NOT NULL DEFAULT 'scheduled'::character varying CHECK (status::text = ANY (ARRAY['scheduled'::character varying, 'active'::character varying, 'completed'::character varying, 'cancelled'::character varying]::text[])),
+  join_link_email_sent boolean DEFAULT false,
+  join_link_sent_at timestamp with time zone,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT interview_configurations_pkey PRIMARY KEY (id),
+  CONSTRAINT interview_configurations_candidate_selection_id_fkey FOREIGN KEY (candidate_selection_id) REFERENCES public.candidate_selections(id)
+);
+CREATE TABLE public.interviews (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  candidate_selection_id uuid NOT NULL,
+  interview_type character varying NOT NULL,
+  difficulty_level character varying NOT NULL,
+  duration_minutes integer NOT NULL DEFAULT 30,
+  coding_round_enabled boolean DEFAULT false,
+  scheduled_at timestamp with time zone NOT NULL,
+  join_link_token character varying NOT NULL UNIQUE,
+  join_link_sent boolean DEFAULT false,
+  join_link_sent_at timestamp with time zone,
+  room_id character varying,
+  room_created boolean DEFAULT false,
+  room_created_at timestamp with time zone,
+  status character varying DEFAULT 'scheduled'::character varying CHECK (status::text = ANY (ARRAY['scheduled'::character varying, 'join-link-sent'::character varying, 'room-created'::character varying, 'in-progress'::character varying, 'completed'::character varying, 'cancelled'::character varying]::text[])),
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT interviews_pkey PRIMARY KEY (id),
+  CONSTRAINT interviews_candidate_selection_id_fkey FOREIGN KEY (candidate_selection_id) REFERENCES public.candidate_selections(id)
+);
+CREATE TABLE public.job_descriptions (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  title character varying NOT NULL,
+  description text NOT NULL,
+  required_skills ARRAY,
+  min_experience_years integer DEFAULT 0,
+  location character varying,
+  degree_required character varying,
+  is_active boolean DEFAULT true,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT job_descriptions_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.meeting_transcription_webhooks (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  room_id text,
+  session_id text,
+  event_type text,
+  payload jsonb NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT meeting_transcription_webhooks_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.meeting_transcripts (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  room_id text NOT NULL,
+  session_id text,
+  participant_id text,
+  participant_name text,
+  speaker_label text,
+  message text NOT NULL,
+  at timestamp with time zone NOT NULL DEFAULT now(),
+  raw jsonb,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT meeting_transcripts_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.resume_scores (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  resume_id uuid NOT NULL,
+  job_description_id uuid NOT NULL,
+  score integer NOT NULL CHECK (score >= 0 AND score <= 100),
+  missing_skills ARRAY,
+  summary text,
+  resume_text text,
+  evaluated_at timestamp with time zone DEFAULT now(),
+  created_at timestamp with time zone DEFAULT now(),
+  must_have_matched_skills jsonb DEFAULT '[]'::jsonb,
+  nice_to_have_matched_skills jsonb DEFAULT '[]'::jsonb,
+  CONSTRAINT resume_scores_pkey PRIMARY KEY (id),
+  CONSTRAINT resume_scores_resume_id_fkey FOREIGN KEY (resume_id) REFERENCES public.resumes(id),
+  CONSTRAINT resume_scores_job_description_id_fkey FOREIGN KEY (job_description_id) REFERENCES public.job_descriptions(id)
+);
+CREATE TABLE public.resumes (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  name character varying NOT NULL,
+  email character varying NOT NULL,
+  date_of_application timestamp with time zone DEFAULT now(),
+  resume_file_url text,
+  resume_file_name character varying,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  years_of_experience integer DEFAULT 0,
+  location character varying,
+  degree character varying,
+  CONSTRAINT resumes_pkey PRIMARY KEY (id)
+);

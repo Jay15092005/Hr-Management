@@ -1,14 +1,16 @@
 import { useState, useEffect } from 'react'
-import { useOutletContext, useLocation } from 'react-router-dom'
+import { useOutletContext, useLocation, useNavigate } from 'react-router-dom'
+import { useAuth } from '../contexts/AuthContext'
 import type { WorkflowContext } from '../App'
 import UploadResume from './UploadResume'
 import ResumeList from './ResumeList'
 import HRWorkflow from './HRWorkflow'
 import JobDescriptionManager from './JobDescription'
 import MeetingOverview from './MeetingOverview'
+import ApplicationLinksManager from './ApplicationLinksManager'
 import './Dashboard.css'
 
-type Section = 'upload' | 'list' | 'description' | 'workflow' | 'meetings'
+type Section = 'upload' | 'list' | 'description' | 'workflow' | 'meetings' | 'forms'
 
 function getDateDisplay() {
   const d = new Date()
@@ -26,6 +28,13 @@ export default function Dashboard() {
   const [refreshKey, setRefreshKey] = useState(0)
   const workflowContext = useOutletContext<WorkflowContext>()
   const location = useLocation()
+  const { user, signOut } = useAuth()
+  const navigate = useNavigate()
+
+  const handleSignOut = async () => {
+    await signOut()
+    navigate('/login', { replace: true })
+  }
 
   useEffect(() => {
     const s = location.state?.section
@@ -39,84 +48,124 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="dashboard-container">
-      <header className="dashboard-header-bar">
-        <div className="header-date">{getDateDisplay()}</div>
-        <nav className="dashboard-nav">
+    <div className="dashboard-layout">
+      <aside className="dashboard-sidebar glass">
+        <div className="sidebar-logo">
+          <div className="logo-icon">HR</div>
+          <span className="logo-text">TalentStream</span>
+        </div>
+        
+        <div className="sidebar-user">
+          <div className="user-avatar">{user?.email?.[0].toUpperCase() ?? 'H'}</div>
+          <div className="user-info">
+            <span className="user-name">{user?.email?.split('@')[0] ?? 'HR Manager'}</span>
+            <span className="user-email">{user?.email ?? 'hr@company.com'}</span>
+          </div>
+        </div>
+
+        <nav className="sidebar-nav">
           <button
-            className={`nav-btn ${activeSection === 'upload' ? 'active' : ''}`}
-            onClick={() => setActiveSection('upload')}
+            className={`sidebar-btn ${activeSection === 'workflow' ? 'active' : ''}`}
+            onClick={() => setActiveSection('workflow')}
           >
-            <span className="nav-icon">📄</span>
-            Upload Resume New
+            <span className="nav-icon">⚡</span>
+            Recruitment Workflow
           </button>
           <button
-            className={`nav-btn ${activeSection === 'list' ? 'active' : ''}`}
+            className={`sidebar-btn ${activeSection === 'list' ? 'active' : ''}`}
             onClick={() => setActiveSection('list')}
           >
             <span className="nav-icon">📄</span>
-            Resume list
+            Resume Repository
           </button>
           <button
-            className={`nav-btn ${activeSection === 'description' ? 'active' : ''}`}
+            className={`sidebar-btn ${activeSection === 'description' ? 'active' : ''}`}
             onClick={() => setActiveSection('description')}
           >
-            <span className="nav-icon">📄</span>
-            Description
+            <span className="nav-icon">📝</span>
+            Job Descriptions
           </button>
           <button
-            className={`nav-btn ${activeSection === 'workflow' ? 'active' : ''}`}
-            onClick={() => setActiveSection('workflow')}
-          >
-            <span className="nav-icon">📄</span>
-            Workflow
-          </button>
-          <button
-            className={`nav-btn ${activeSection === 'meetings' ? 'active' : ''}`}
+            className={`sidebar-btn ${activeSection === 'meetings' ? 'active' : ''}`}
             onClick={() => setActiveSection('meetings')}
           >
-            <span className="nav-icon">📋</span>
-            Meeting Details
+            <span className="nav-icon">📅</span>
+            Interviews & AI
+          </button>
+          <button
+            className={`sidebar-btn ${activeSection === 'forms' ? 'active' : ''}`}
+            onClick={() => setActiveSection('forms')}
+          >
+            <span className="nav-icon">🔗</span>
+            Application Links
           </button>
         </nav>
-      </header>
 
-      <div className="dashboard-content">
-        {activeSection === 'upload' && (
-          <div className="dashboard-section">
-            <UploadResume onUploadSuccess={handleUploadSuccess} />
-          </div>
-        )}
+        <div className="sidebar-footer">
+          <button type="button" className="logout-btn" onClick={handleSignOut}>
+            <span className="nav-icon">🚪</span>
+            Sign out
+          </button>
+        </div>
+      </aside>
 
-        {activeSection === 'list' && (
-          <div className="dashboard-section">
-            <ResumeList refreshTrigger={refreshKey} />
+      <main className="dashboard-main">
+        <header className="dashboard-top-bar glass">
+          <div className="header-breadcrumbs">
+            <span className="breadcrumb-path">Dashboard</span>
+            <span className="breadcrumb-separator">/</span>
+            <span className="breadcrumb-current">
+              {activeSection.charAt(0).toUpperCase() + activeSection.slice(1)}
+            </span>
           </div>
-        )}
+          <div className="header-date">{getDateDisplay()}</div>
+        </header>
 
-        {activeSection === 'description' && (
-          <div className="dashboard-section">
-            <JobDescriptionManager onJobDescriptionSelect={() => {}} />
-          </div>
-        )}
+        <div className="dashboard-content-wrapper">
+          <div className="dashboard-content">
+            {activeSection === 'upload' && (
+              <div className="dashboard-section">
+                <UploadResume onUploadSuccess={handleUploadSuccess} />
+              </div>
+            )}
 
-        {activeSection === 'workflow' && (
-          <div className="dashboard-section">
-            <HRWorkflow
-              selectedJobDescription={workflowContext.selectedJobDescription}
-              setSelectedJobDescription={workflowContext.setSelectedJobDescription}
-              filteredResumes={workflowContext.filteredResumes}
-              setFilteredResumes={workflowContext.setFilteredResumes}
-            />
-          </div>
-        )}
+            {activeSection === 'list' && (
+              <div className="dashboard-section">
+                <ResumeList refreshTrigger={refreshKey} />
+              </div>
+            )}
 
-        {activeSection === 'meetings' && (
-          <div className="dashboard-section">
-            <MeetingOverview />
+            {activeSection === 'description' && (
+              <div className="dashboard-section">
+                <JobDescriptionManager onJobDescriptionSelect={() => {}} />
+              </div>
+            )}
+
+            {activeSection === 'workflow' && (
+              <div className="dashboard-section">
+                <HRWorkflow
+                  selectedJobDescription={workflowContext.selectedJobDescription}
+                  setSelectedJobDescription={workflowContext.setSelectedJobDescription}
+                  filteredResumes={workflowContext.filteredResumes}
+                  setFilteredResumes={workflowContext.setFilteredResumes}
+                />
+              </div>
+            )}
+
+            {activeSection === 'meetings' && (
+              <div className="dashboard-section">
+                <MeetingOverview />
+              </div>
+            )}
+
+            {activeSection === 'forms' && (
+              <div className="dashboard-section">
+                <ApplicationLinksManager />
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        </div>
+      </main>
     </div>
   )
 }

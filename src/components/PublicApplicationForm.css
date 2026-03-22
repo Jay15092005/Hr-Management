@@ -1,0 +1,129 @@
+.paf-wrap {
+  min-height: 100vh;
+  background: var(--bg-main);
+  padding: 4rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.paf-card {
+  max-width: 800px;
+  width: 100%;
+  background: white;
+  border-radius: var(--radius-xl);
+  padding: 3rem;
+  box-shadow: var(--shadow-2xl);
+  border: 1px solid var(--border-color);
+  position: relative;
+  overflow: hidden;
+}
+
+.paf-header-strip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 6px;
+  background: var(--gradient-primary);
+}
+
+.paf-card h1 {
+  font-family: 'Outfit', sans-serif;
+  font-size: 2.25rem;
+  font-weight: 800;
+  color: var(--text-main);
+  margin-bottom: 1rem;
+}
+
+.paf-job-desc {
+  font-size: 1.125rem;
+  line-height: 1.7;
+  color: var(--text-muted);
+  margin-bottom: 2rem;
+}
+
+.paf-expiry {
+  display: inline-block;
+  background: #fef2f2;
+  color: #991b1b;
+  padding: 0.5rem 1rem;
+  border-radius: 99px;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  margin-bottom: 3rem;
+}
+
+.paf-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.paf-form label {
+  font-weight: 700;
+  font-size: 0.875rem;
+  color: var(--text-main);
+}
+
+.paf-form input {
+  width: 100%;
+  padding: 0.875rem 1.25rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  font-size: 1rem;
+  background: var(--bg-main);
+  transition: all 0.2s;
+  outline: none;
+}
+
+.paf-form input:focus {
+  background: white;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px var(--primary-light);
+}
+
+.paf-note {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: -0.5rem;
+}
+
+.paf-submit {
+  background: var(--primary);
+  color: white;
+  border: none;
+  padding: 1.125rem;
+  border-radius: var(--radius-md);
+  font-weight: 800;
+  font-size: 1.125rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 10px 25px rgba(99, 102, 241, 0.3);
+  margin-top: 1rem;
+}
+
+.paf-submit:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 15px 30px rgba(99, 102, 241, 0.4);
+}
+
+.paf-thanks {
+  text-align: center;
+  padding: 5rem 2rem;
+}
+
+.paf-celebrate {
+  font-size: 5rem;
+  margin-bottom: 1.5rem;
+}
+
+@media (max-width: 640px) {
+  .paf-card {
+    padding: 2rem;
+  }
+  
+  .paf-card h1 {
+    font-size: 1.75rem;
+  }
+}

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase, type CandidateWithScore, type JobDescription, type InterviewConfiguration } from '../lib/supabase'
 import { sendSelectionEmail } from '../utils/email'
 import InterviewScheduler from './InterviewScheduler'
+import ResumeFileLink from './ResumeFileLink'
 import './HRReview.css'
 
 interface HRReviewProps {
@@ -50,6 +51,7 @@ export default function HRReview({ jobDescription, compact = false }: HRReviewPr
             email,
             date_of_application,
             resume_file_url,
+            storage_object_path,
             resume_file_name,
             years_of_experience,
             location,
@@ -392,14 +394,9 @@ export default function HRReview({ jobDescription, compact = false }: HRReviewPr
           <div className="candidates-list-compact">
             {candidates.map((candidate) => (
               <div key={candidate.id} className="candidate-row-compact">
-                <a
-                  href={candidate.resume_file_url || '#'}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn-view-resume-show"
-                >
+                <ResumeFileLink resume={candidate} className="btn-view-resume-show">
                   View Resume show
-                </a>
+                </ResumeFileLink>
                 {candidate.score ? (
                   <span
                     className="score-badge-compact"
@@ -693,14 +690,9 @@ export default function HRReview({ jobDescription, compact = false }: HRReviewPr
               </div>
 
               <div className="candidate-actions">
-                <a
-                  href={candidate.resume_file_url || '#'}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn-view-resume"
-                >
+                <ResumeFileLink resume={candidate} className="btn-view-resume">
                   📄 View Resume
-                </a>
+                </ResumeFileLink>
 
                 <div className="action-buttons">
                   {candidate.selection?.status === 'selected' ? (

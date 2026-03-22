@@ -82,18 +82,19 @@ export default function UploadResume({ onUploadSuccess }: UploadResumeProps) {
       // Step 1: Upload file to Supabase Storage
       const uploadResult = await uploadResume(file, formData.name)
 
-      if (!uploadResult.success || !uploadResult.url || !uploadResult.path) {
+      if (!uploadResult.success || !uploadResult.path) {
         throw new Error(uploadResult.error || 'Failed to upload file')
       }
 
-      // Step 2: Save resume data to database
+      // Step 2: Save resume data to database (private storage path + signed URLs in UI)
       const { error: dbError } = await supabase
         .from('resumes')
         .insert([
           {
             name: formData.name.trim(),
             email: formData.email.trim(),
-            resume_file_url: uploadResult.url,
+            resume_file_url: null,
+            storage_object_path: uploadResult.path,
             resume_file_name: file.name,
             years_of_experience: formData.years_of_experience || null,
             location: formData.location.trim() || null,

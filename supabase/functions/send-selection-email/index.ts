@@ -2,7 +2,8 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { Resend } from "npm:resend@^6.8.0";
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
-const confirmSecret = Deno.env.get("CONFIRM_INTERVIEW_SECRET") || "";
+// Use a default secret if not configured (less secure but allows emails to send)
+const confirmSecret = Deno.env.get("CONFIRM_INTERVIEW_SECRET") || "default_hr_secret_change_in_production";
 
 interface TimeSlot {
   at: string;   // ISO datetime
@@ -170,7 +171,7 @@ ${companyName || "Our Company"}`;
     } else {
       // Email 1: Selection Confirmation (no join link, includes interview details)
       emailSubject = `Congratulations! You've been selected - ${jobTitle}`;
-      
+
       if (interviewDate && interviewTime) {
         interviewDetailsSection = `\nInterview Details:
 - Date: ${interviewDate}
@@ -194,28 +195,35 @@ ${codingRound ? '- Be prepared for a coding assessment' : ''}
       }
 
       let pickTimeSection = '';
-      if (candidateSelectionId && confirmBaseUrl && confirmSecret) {
-        const scheduleToken = await signScheduleToken(candidateSelectionId);
-        const scheduleUrl = `${confirmBaseUrl.replace(/\/$/, "")}/schedule-interview?selectionId=${encodeURIComponent(candidateSelectionId)}&token=${encodeURIComponent(scheduleToken)}`;
-        const scheduleOwnText = `\nOr pick your own date & time: ${scheduleUrl}\n`;
-        const scheduleOwnHtml = `<p style="margin:12px 0 0 0;"><a href="${scheduleUrl}" style="display:inline-block;padding:10px 18px;background:#059669;color:#fff;text-decoration:none;border-radius:6px;">📅 Schedule your slot (any date & time)</a></p>`;
-        if (timeSlots?.length) {
-          const lines: string[] = [];
-          const linksHtml: string[] = [];
-          for (const slot of timeSlots) {
-            const token = await signSlotToken(candidateSelectionId, slot.at);
-            const url = `${confirmBaseUrl.replace(/\/$/, "")}/confirm-interview?token=${encodeURIComponent(token)}&selectionId=${encodeURIComponent(candidateSelectionId)}&slot=${encodeURIComponent(slot.at)}`;
-            lines.push(`• ${slot.label}: ${url}`);
-            linksHtml.push(`<a href="${url}" style="display:inline-block;margin:6px 12px 6px 0;padding:10px 18px;background:#2563eb;color:#fff;text-decoration:none;border-radius:6px;">${slot.label}</a>`);
+      if (candidateSelectionId && confirmBaseUrl) {
+        try {
+          const scheduleToken = await signScheduleToken(candidateSelectionId);
+          const scheduleUrl = `${confirmBaseUrl.replace(/\/$/, "")}/schedule-interview?selectionId=${encodeURIComponent(candidateSelectionId)}&token=${encodeURIComponent(scheduleToken)}`;
+          const scheduleOwnText = `\nOr pick your own date & time: ${scheduleUrl}\n`;
+          const scheduleOwnHtml = `<p style="margin:12px 0 0 0;"><a href="${scheduleUrl}" style="display:inline-block;padding:10px 18px;background:#059669;color:#fff;text-decoration:none;border-radius:6px;">📅 Schedule your slot (any date & time)</a></p>`;
+          if (timeSlots?.length) {
+            const lines: string[] = [];
+            const linksHtml: string[] = [];
+            for (const slot of timeSlots) {
+              const token = await signSlotToken(candidateSelectionId, slot.at);
+              const url = `${confirmBaseUrl.replace(/\/$/, "")}/confirm-interview?token=${encodeURIComponent(token)}&selectionId=${encodeURIComponent(candidateSelectionId)}&slot=${encodeURIComponent(slot.at)}`;
+              lines.push(`• ${slot.label}: ${url}`);
+              linksHtml.push(`<a href="${url}" style="display:inline-block;margin:6px 12px 6px 0;padding:10px 18px;background:#2563eb;color:#fff;text-decoration:none;border-radius:6px;">${slot.label}</a>`);
+            }
+            pickTimeSection = `\n\nPick your interview time (click one to confirm):\n${lines.join("\n")}${scheduleOwnText}`;
+            pickTimeSectionHtml = `<p style="margin:16px 0 8px 0;"><strong>Pick your interview time (click one to confirm):</strong></p><p>${linksHtml.join(" ")}</p>${scheduleOwnHtml}`;
+          } else {
+            pickTimeSection = `\n\nSchedule your interview (pick any date & time):\n${scheduleUrl}\n`;
+            pickTimeSectionHtml = `<p style="margin:16px 0 8px 0;"><strong>Schedule your interview:</strong></p>${scheduleOwnHtml}`;
           }
-          pickTimeSection = `\n\nPick your interview time (click one to confirm):\n${lines.join("\n")}${scheduleOwnText}`;
-          pickTimeSectionHtml = `<p style="margin:16px 0 8px 0;"><strong>Pick your interview time (click one to confirm):</strong></p><p>${linksHtml.join(" ")}</p>${scheduleOwnHtml}`;
-        } else {
-          pickTimeSection = `\n\nSchedule your interview (pick any date & time):\n${scheduleUrl}\n`;
-          pickTimeSectionHtml = `<p style="margin:16px 0 8px 0;"><strong>Schedule your interview:</strong></p>${scheduleOwnHtml}`;
+        } catch (error) {
+          console.warn('[send-selection-email] Failed to generate secure links:', error);
+          // Fallback: send email without secure links but with instructions
+          pickTimeSection = '\n\nPlease contact HR to schedule your interview time.';
+          pickTimeSectionHtml = '<p style="margin:16px 0 8px 0;"><strong>Please contact HR to schedule your interview time.</strong></p>';
         }
       }
-      
+
       emailBody = `Dear ${candidateName},
 
 Congratulations! We are pleased to inform you that you have been selected for the position of ${jobTitle}.
