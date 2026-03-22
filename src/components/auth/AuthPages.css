@@ -99,3 +99,18 @@
 .auth-links a {
   color: #2563eb;
 }
+
+.auth-card .auth-otp-input {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 1.25rem;
+  letter-spacing: 0.2em;
+  text-align: center;
+  margin-bottom: 0.35rem;
+}
+
+.auth-card .auth-otp-hint {
+  margin: 0 0 1rem;
+  font-size: 0.75rem;
+  color: #64748b;
+}

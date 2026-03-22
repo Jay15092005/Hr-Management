@@ -30,14 +30,21 @@ export default function VerifyOtpPage() {
     )
   }
 
+  /** Must match Supabase: Authentication → Providers → Email → Email OTP Length (6). */
+  const OTP_LENGTH = 6
+
+  const setOtpDigitsOnly = (raw: string) => {
+    const digits = raw.replace(/\D/g, '').slice(0, OTP_LENGTH)
+    setToken(digits)
+  }
+
   const resend = async () => {
     setError(null)
     setSubmitting(true)
     try {
-      const shouldCreate = state.mode === 'signup'
       const { error: otpError } = await supabase.auth.signInWithOtp({
         email,
-        options: { shouldCreateUser: shouldCreate },
+        options: { shouldCreateUser: true },
       })
       if (otpError) throw otpError
     } catch (err) {
@@ -50,9 +57,9 @@ export default function VerifyOtpPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
-    const code = token.replace(/\s/g, '')
-    if (code.length < 6) {
-      setError('Enter the code from your email.')
+    const code = token.replace(/\D/g, '')
+    if (code.length !== OTP_LENGTH) {
+      setError(`Enter the ${OTP_LENGTH}-digit code from your email.`)
       return
     }
     setSubmitting(true)
@@ -76,22 +83,34 @@ export default function VerifyOtpPage() {
       <div className="auth-card">
         <h1>Enter verification code</h1>
         <p className="sub">
-          We sent a code to <strong>{email}</strong>. Paste it below to finish signing{' '}
-          {state.mode === 'signup' ? 'up' : 'in'}.
+          We sent a <strong>{OTP_LENGTH}-digit</strong> code to <strong>{email}</strong>. Enter it below to finish.
         </p>
         <form onSubmit={handleSubmit}>
           {error && <div className="error">{error}</div>}
-          <label htmlFor="token">One-time code</label>
+          <label htmlFor="token">{OTP_LENGTH}-digit code</label>
           <input
             id="token"
             name="token"
+            type="text"
             inputMode="numeric"
+            pattern="[0-9]*"
             autoComplete="one-time-code"
+            maxLength={OTP_LENGTH}
             value={token}
-            onChange={(e) => setToken(e.target.value)}
-            placeholder="123456"
+            onChange={(e) => setOtpDigitsOnly(e.target.value)}
+            onPaste={(e) => {
+              e.preventDefault()
+              const text = e.clipboardData?.getData('text') ?? ''
+              setOtpDigitsOnly(text)
+            }}
+            placeholder={'•'.repeat(OTP_LENGTH)}
+            aria-describedby="otp-hint"
             disabled={submitting}
+            className="auth-otp-input"
           />
+          <p id="otp-hint" className="auth-otp-hint">
+            Numbers only — exactly {OTP_LENGTH} digits.
+          </p>
           <button type="submit" disabled={submitting}>
             {submitting ? 'Verifying…' : 'Verify and continue'}
           </button>

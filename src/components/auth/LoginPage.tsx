@@ -21,7 +21,8 @@ export default function LoginPage() {
     try {
       const { error: otpError } = await supabase.auth.signInWithOtp({
         email: trimmed,
-        options: { shouldCreateUser: false },
+        // Allow first-time emails: same OTP flow as signup (avoids “Signups not allowed” for new users on /login)
+        options: { shouldCreateUser: true },
       })
       if (otpError) throw otpError
       navigate('/auth/verify-otp', { state: { email: trimmed, mode: 'login' as const } })
@@ -36,7 +37,9 @@ export default function LoginPage() {
     <div className="auth-page">
       <div className="auth-card">
         <h1>HR sign in</h1>
-        <p className="sub">We’ll email you a one-time code (passwordless).</p>
+        <p className="sub">
+          We’ll email you a one-time code. New here? We’ll create your workspace when you verify.
+        </p>
         <form onSubmit={handleSubmit}>
           {error && <div className="error">{error}</div>}
           <label htmlFor="email">Email</label>
