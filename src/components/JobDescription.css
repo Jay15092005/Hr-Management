@@ -10,7 +10,7 @@
 }
 
 .job-description-header h2 {
-  font-family: 'Outfit', sans-serif;
+  font-family: 'Montserrat', sans-serif;
   font-size: 1.5rem;
   font-weight: 700;
   color: var(--text-main);
@@ -27,7 +27,7 @@
 }
 
 .job-form-card h3 {
-  font-family: 'Outfit', sans-serif;
+  font-family: 'Montserrat', sans-serif;
   font-size: 1.25rem;
   font-weight: 700;
   margin-bottom: 2rem;
@@ -112,7 +112,7 @@
 }
 
 .job-card-header h3 {
-  font-family: 'Outfit', sans-serif;
+  font-family: 'Montserrat', sans-serif;
   font-size: 1.125rem;
   font-weight: 700;
   color: var(--text-main);

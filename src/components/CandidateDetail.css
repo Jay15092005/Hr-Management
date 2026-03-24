@@ -30,7 +30,7 @@
 }
 
 .candidate-detail-title {
-  font-family: 'Outfit', sans-serif;
+  font-family: 'Montserrat', sans-serif;
   font-size: 2.5rem;
   font-weight: 800;
   color: var(--text-main);
@@ -53,7 +53,7 @@
 }
 
 .candidate-detail-section h2 {
-  font-family: 'Outfit', sans-serif;
+  font-family: 'Montserrat', sans-serif;
   font-size: 1.25rem;
   font-weight: 700;
   margin-bottom: 2rem;

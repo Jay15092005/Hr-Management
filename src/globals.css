@@ -59,8 +59,12 @@
   box-sizing: border-box;
 }
 
+button, input, textarea, select {
+  font-family: inherit;
+}
+
 body {
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: 'Montserrat', sans-serif;
   background: var(--bg-main);
   color: var(--text-main);
   line-height: 1.5;
@@ -70,7 +74,7 @@ body {
 }
 
 h1, h2, h3, h4, .font-heading {
-  font-family: 'Outfit', sans-serif;
+  font-family: 'Montserrat', sans-serif;
   font-weight: 600;
   letter-spacing: -0.02em;
 }

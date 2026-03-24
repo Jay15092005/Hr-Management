@@ -103,7 +103,7 @@ export default function Dashboard() {
 
         <div className="sidebar-footer">
           <button type="button" className="logout-btn" onClick={handleSignOut}>
-            <span className="nav-icon">🚪</span>
+            
             Sign out
           </button>
         </div>

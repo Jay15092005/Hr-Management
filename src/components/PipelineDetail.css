@@ -37,7 +37,7 @@
 }
 
 .pd-name {
-  font-family: 'Outfit', sans-serif;
+  font-family: 'Montserrat', sans-serif;
   font-size: 2rem;
   font-weight: 800;
   color: var(--text-main);
@@ -79,7 +79,7 @@
 .pd-score-circle.low { border-color: var(--error); background: #fef2f2; }
 
 .pd-score-num {
-  font-family: 'Outfit', sans-serif;
+  font-family: 'Montserrat', sans-serif;
   font-size: 1.5rem;
   font-weight: 800;
   line-height: 1;
@@ -181,7 +181,7 @@
 }
 
 .pd-card-title {
-  font-family: 'Outfit', sans-serif;
+  font-family: 'Montserrat', sans-serif;
   font-size: 1rem;
   font-weight: 700;
   color: var(--text-main);

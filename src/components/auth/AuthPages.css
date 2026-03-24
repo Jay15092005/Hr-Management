@@ -64,7 +64,7 @@
 .auth-card h1 {
   margin: 0 0 0.5rem;
   font-size: 1.75rem;
-  font-family: 'Outfit', sans-serif;
+  font-family: 'Montserrat', sans-serif;
   color: var(--text-main);
   text-align: center;
 }
@@ -181,7 +181,7 @@
 }
 
 .auth-otp-input {
-  font-family: 'Outfit', ui-monospace, SFMono-Regular, monospace;
+  font-family: 'Montserrat', ui-monospace, SFMono-Regular, monospace;
   font-variant-numeric: tabular-nums;
   font-size: 1.75rem !important;
   letter-spacing: 0.5rem;
