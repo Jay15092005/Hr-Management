@@ -10,12 +10,19 @@ if (!supabaseUrl || !supabaseAnonKey) {
   )
 }
 
+/** Set by AuthProvider: Clerk session JWT for Supabase third-party auth (see Supabase + Clerk docs). */
+let clerkAccessTokenGetter: () => Promise<string | null> = async () => null
+
+export function setClerkSupabaseAccessToken(getter: () => Promise<string | null>) {
+  clerkAccessTokenGetter = getter
+}
+
+/**
+ * Single client for the app. Uses Clerk session tokens when signed in; `auth` namespace is not used
+ * (Supabase requirement when `accessToken` is set).
+ */
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: true,
-  },
+  accessToken: () => clerkAccessTokenGetter(),
 })
 
 export interface Resume {

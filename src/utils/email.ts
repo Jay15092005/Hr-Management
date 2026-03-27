@@ -73,7 +73,14 @@ export async function sendSelectionEmail(data: EmailData): Promise<SendSelection
       console.log('[Email] Selection email sent successfully, messageId:', result.messageId)
       return { ok: true, messageId: result.messageId }
     }
-    const errMsg = result?.error || 'Unknown error from send-selection-email'
+    const providerDetail =
+      result?.details?.message ||
+      result?.details?.error ||
+      result?.details?.name ||
+      ''
+    const errMsg = [result?.error || 'Unknown error from send-selection-email', providerDetail]
+      .filter(Boolean)
+      .join(': ')
     console.error('[Email] Send failed:', errMsg, result?.details)
     return { ok: false, error: errMsg }
   } catch (error) {

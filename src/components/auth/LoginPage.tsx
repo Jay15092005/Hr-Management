@@ -1,69 +1,53 @@
-import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { supabase } from '../../lib/supabase'
-import './AuthPages.css'
+import { Navigate } from 'react-router-dom'
+import { SignIn, useAuth as useClerkAuth } from '@clerk/react'
+import { useAuth } from '../../contexts/AuthContext'
+import './ClerkAuth.css'
 
 export default function LoginPage() {
-  const navigate = useNavigate()
-  const [email, setEmail] = useState('')
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const { isLoaded: clerkLoaded, isSignedIn } = useClerkAuth()
+  const { loading, syncError, clearSyncError } = useAuth()
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError(null)
-    const trimmed = email.trim().toLowerCase()
-    if (!trimmed) {
-      setError('Enter your work email.')
-      return
-    }
-    setSubmitting(true)
-    try {
-      const { error: otpError } = await supabase.auth.signInWithOtp({
-        email: trimmed,
-        // Allow first-time emails: same OTP flow as signup (avoids “Signups not allowed” for new users on /login)
-        options: { shouldCreateUser: true },
-      })
-      if (otpError) throw otpError
-      navigate('/auth/verify-otp', { state: { email: trimmed, mode: 'login' as const } })
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not send code')
-    } finally {
-      setSubmitting(false)
-    }
+  // Clerk signed in and HR profile sync finished (third-party Supabase tokens — no Supabase Auth session).
+  const readyForApp = clerkLoaded && isSignedIn && !loading
+
+  if (readyForApp) {
+    return <Navigate to="/" replace />
   }
 
+  const showSpinner = !clerkLoaded || (isSignedIn && loading)
+
   return (
-    <div className="auth-page">
-      <div className="auth-card">
-        <h1>HR sign in</h1>
-        <p className="sub">
-          We’ll email you a one-time code. New here? We’ll create your workspace when you verify.
+    <div className="clerk-auth-root">
+      {showSpinner && (
+        <p className="clerk-auth-status" style={{ margin: '0 0 1rem', color: '#64748b' }}>
+          Connecting…
         </p>
-        <form onSubmit={handleSubmit}>
-          {error && <div className="error">{error}</div>}
-          <label htmlFor="email">Email</label>
-          <input
-            id="email"
-            name="email"
-            type="email"
-            autoComplete="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="you@company.com"
-            disabled={submitting}
-          />
-          <button type="submit" disabled={submitting}>
-            {submitting ? 'Sending code…' : 'Send code'}
+      )}
+      {syncError && (
+        <div
+          role="alert"
+          style={{
+            maxWidth: 420,
+            marginBottom: '1rem',
+            padding: '0.75rem 1rem',
+            background: '#fef2f2',
+            color: '#991b1b',
+            borderRadius: 8,
+            fontSize: '0.875rem',
+            lineHeight: 1.45,
+          }}
+        >
+          <strong>Setup required.</strong> {syncError}
+          <button
+            type="button"
+            onClick={() => clearSyncError()}
+            style={{ display: 'block', marginTop: '0.5rem', textDecoration: 'underline', cursor: 'pointer', background: 'none', border: 'none', color: 'inherit', padding: 0, font: 'inherit' }}
+          >
+            Dismiss
           </button>
-        </form>
-        <div className="auth-links">
-          <Link to="/signup">New HR? Create an account</Link>
-          <span className="hint">
-            Trouble receiving the code? Check spam or wait a minute and try again from this page.
-          </span>
         </div>
-      </div>
+      )}
+      <SignIn path="/login" routing="path" signUpUrl="/signup" />
     </div>
   )
 }

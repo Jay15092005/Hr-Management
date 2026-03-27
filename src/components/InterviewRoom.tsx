@@ -46,23 +46,23 @@ const getVideoSDKToken = async (): Promise<string | null> => {
 }
 
 function Controls() {
-  const { leave, toggleMic, toggleWebcam, micEnabled, webcamEnabled } = useMeeting()
+  const { leave, toggleMic, toggleWebcam, localMicOn, localWebcamOn } = useMeeting()
 
   return (
     <div className="meeting-controls">
       <button
         onClick={() => toggleMic()}
-        className={`control-btn ${micEnabled ? 'active' : 'inactive'}`}
-        title={micEnabled ? 'Mute Microphone' : 'Unmute Microphone'}
+        className={`control-btn ${localMicOn ? 'active' : 'inactive'}`}
+        title={localMicOn ? 'Mute Microphone' : 'Unmute Microphone'}
       >
-        {micEnabled ? '🎤' : '🔇'}
+        {localMicOn ? '🎤' : '🔇'}
       </button>
       <button
         onClick={() => toggleWebcam()}
-        className={`control-btn ${webcamEnabled ? 'active' : 'inactive'}`}
-        title={webcamEnabled ? 'Turn Off Camera' : 'Turn On Camera'}
+        className={`control-btn ${localWebcamOn ? 'active' : 'inactive'}`}
+        title={localWebcamOn ? 'Turn Off Camera' : 'Turn On Camera'}
       >
-        {webcamEnabled ? '📹' : '📷'}
+        {localWebcamOn ? '📹' : '📷'}
       </button>
       <button onClick={() => leave()} className="control-btn leave-btn" title="Leave Meeting">
         🚪 Leave
@@ -161,7 +161,7 @@ function ParticipantView({ participantId, roomId }: { participantId: string; roo
   )
 }
 
-function MeetingView({ roomId, candidateName, onLeave }: InterviewRoomProps) {
+function MeetingView({ roomId, onLeave }: Pick<InterviewRoomProps, 'roomId' | 'onLeave'>) {
   const [joined, setJoined] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [roomValid, setRoomValid] = useState<boolean | null>(null)
@@ -293,8 +293,8 @@ function MeetingView({ roomId, candidateName, onLeave }: InterviewRoomProps) {
             webhookUrl,
             hasPrompt: !!transcriptionConfig.summary.prompt,
           })
-          // If you don't have a webhookUrl or awsDirPath, you should pass null (per VideoSDK docs)
-          startRecording(webhookUrl, null, null, transcriptionConfig)
+          // Optional webhook/layout: pass undefined for unused slots (typed API)
+          startRecording(webhookUrl ?? undefined, undefined, undefined, transcriptionConfig)
         } catch (e) {
           console.error('[Recording] Failed to start recording with transcription:', e)
         }
@@ -475,10 +475,11 @@ export default function InterviewRoom({ roomId, candidateName, onLeave }: Interv
         micEnabled: true,
         webcamEnabled: true,
         name: candidateName,
+        debugMode: false,
       }}
       token={token}
     >
-      <MeetingView roomId={roomId} candidateName={candidateName} onLeave={onLeave} />
+      <MeetingView roomId={roomId} onLeave={onLeave} />
     </MeetingProvider>
   )
 }

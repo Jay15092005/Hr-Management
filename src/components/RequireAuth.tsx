@@ -2,7 +2,7 @@ import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 
 export default function RequireAuth() {
-  const { session, loading } = useAuth()
+  const { isSignedIn, loading } = useAuth()
   const location = useLocation()
 
   if (loading) {
@@ -13,7 +13,7 @@ export default function RequireAuth() {
     )
   }
 
-  if (!session) {
+  if (!isSignedIn) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />
   }
 

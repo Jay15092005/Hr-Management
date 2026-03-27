@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { supabase, type CandidateWithScore, type JobDescription, type InterviewConfiguration } from '../lib/supabase'
-import { sendSelectionEmail } from '../utils/email'
 import InterviewScheduler from './InterviewScheduler'
 import ResumeFileLink from './ResumeFileLink'
 import './HRReview.css'

@@ -78,7 +78,7 @@ export default function CheatingDetector({ videoElement, roomId, enabled = true 
     const [attentionScore, setAttentionScore] = useState(100)
     const [currentViolations, setCurrentViolations] = useState<string[]>([])
     const [gazeDirection, setGazeDirection] = useState<GazeDirection>('center')
-    const [isDetecting, setIsDetecting] = useState(false)
+    const [, setIsDetecting] = useState(false)
     const [mobileDetected, setMobileDetected] = useState(false)
     const canvasRef = useRef<HTMLCanvasElement>(null)
     const faceMeshRef = useRef<FaceMesh | null>(null)
@@ -262,8 +262,6 @@ export default function CheatingDetector({ videoElement, roomId, enabled = true 
         const noseTip = landmarks[1]
         const leftEye = landmarks[33]
         const rightEye = landmarks[263]
-        const chin = landmarks[152]
-        const forehead = landmarks[10]
 
         const eyeMidX = (leftEye.x + rightEye.x) / 2
         const eyeMidY = (leftEye.y + rightEye.y) / 2
@@ -275,10 +273,6 @@ export default function CheatingDetector({ videoElement, roomId, enabled = true 
         // Roll: angle of eye line
         const eyeAngle = Math.atan2(rightEye.y - leftEye.y, rightEye.x - leftEye.x)
         const roll = eyeAngle * (180 / Math.PI)
-
-        // Additional: face vertical symmetry check
-        const faceH = Math.abs(chin.y - forehead.y)
-        const noseAboveMid = (noseTip.y - forehead.y) / (faceH || 0.01)
 
         return { pitch, yaw, roll }
     }

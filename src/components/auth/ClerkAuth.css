@@ -1,0 +1,9 @@
+/* Minimal layout only — Clerk supplies all auth UI. */
+.clerk-auth-root {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  box-sizing: border-box;
+}

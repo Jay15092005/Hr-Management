@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { Resend } from "npm:resend@^6.8.0";
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
+const resendFrom = Deno.env.get("RESEND_FROM") || "HR Team <onboarding@resend.dev>";
 // Use a default secret if not configured (less secure but allows emails to send)
 const confirmSecret = Deno.env.get("CONFIRM_INTERVIEW_SECRET") || "default_hr_secret_change_in_production";
 
@@ -240,7 +241,7 @@ ${companyName || "Our Company"}`;
     }
 
     const emailPayload: { from: string; to: string; subject: string; text: string; html?: string } = {
-      from: "HR Team <onboarding@resend.dev>",
+      from: resendFrom,
       to: to,
       subject: emailSubject,
       text: emailBody,
@@ -262,6 +263,8 @@ ${companyName || "Our Company"}`;
 
     if (error) {
       console.error("[send-selection-email] Resend error:", JSON.stringify(error));
+      // Common failure in dev: onboarding@resend.dev can only send to account owner.
+      // Use RESEND_FROM with a verified domain to send to arbitrary recipients.
       return new Response(
         JSON.stringify({ error: "Failed to send email", details: error }),
         {

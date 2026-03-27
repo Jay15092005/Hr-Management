@@ -1,0 +1,42 @@
+# Edge Functions: JWT verification uses Supabase Auth by default. With Clerk session tokens,
+# the gateway rejects requests before Deno runs. Disable verify_jwt for functions invoked from
+# the browser with Clerk (functions do their own validation / use service role where needed).
+# Redeploy functions after changing this file: supabase functions deploy <name>
+
+project_id = "fvsywwknwfeyvxvjlmmd"
+
+[functions.send-selection-email]
+verify_jwt = false
+
+[functions.send-interview-link-email]
+verify_jwt = false
+
+[functions.create-instant-interview]
+verify_jwt = false
+
+[functions.schedule-interview]
+verify_jwt = false
+
+[functions.generate-videosdk-token]
+verify_jwt = false
+
+[functions.save-meeting-transcript]
+verify_jwt = false
+
+[functions.import-meeting-transcript]
+verify_jwt = false
+
+[functions.confirm-interview-slot]
+verify_jwt = false
+
+[functions.save-cheating-detection]
+verify_jwt = false
+
+[functions.submit-public-application]
+verify_jwt = false
+
+[functions.create-interview-room]
+verify_jwt = false
+
+[functions.videosdk-transcription-webhook]
+verify_jwt = false

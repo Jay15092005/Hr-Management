@@ -3,6 +3,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 import { Resend } from "npm:resend@^6.8.0";
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
+const resendFrom = Deno.env.get("RESEND_FROM") || "HR Team <onboarding@resend.dev>";
 
 // Initialize Supabase client
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -331,7 +332,7 @@ HR Team`;
 
     // Send email using Resend
     const { data: emailData, error: emailError } = await resend.emails.send({
-      from: "HR Team <onboarding@resend.dev>", // Update this with your verified domain
+      from: resendFrom,
       to: resume.email,
       subject: emailSubject,
       text: emailBody,

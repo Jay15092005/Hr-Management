@@ -267,74 +267,6 @@ export default function CandidatesTable({ resumes, jobDescription }: CandidatesT
     }
   }
 
-  const handleSelect = async (row: RowData) => {
-    if (!jobDescription) return
-    setProcessing(row.resume.id)
-    setError(null)
-    try {
-      await supabase.from('candidate_selections').upsert(
-        {
-          resume_id: row.resume.id,
-          job_description_id: jobDescription.id,
-          status: 'selected',
-          selected_at: new Date().toISOString(),
-        },
-        { onConflict: 'resume_id,job_description_id' }
-      )
-      // Navigate to detail page after selecting
-      navigate(`/candidate/${jobDescription.id}/${row.resume.id}`)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed')
-    } finally {
-      setProcessing(null)
-      setMenuOpenId(null)
-    }
-  }
-
-  const handleReject = async (row: RowData) => {
-    if (!jobDescription) return
-    setProcessing(row.resume.id)
-    setError(null)
-    try {
-      await supabase.from('candidate_selections').upsert(
-        {
-          resume_id: row.resume.id,
-          job_description_id: jobDescription.id,
-          status: 'rejected',
-          rejected_at: new Date().toISOString(),
-          email_sent: false,
-          email_sent_at: null,
-        },
-        { onConflict: 'resume_id,job_description_id' }
-      )
-      await fetchData()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed')
-    } finally {
-      setProcessing(null)
-      setMenuOpenId(null)
-    }
-  }
-
-  const handleScheduleInterview = (row: RowData) => {
-    if (!row.selection) return
-    setSchedulingRow(row)
-    setMenuOpenId(null)
-  }
-
-  const handleInstantInterview = (row: RowData) => {
-    if (!row.selection) return
-    setInstantRow(row)
-    setInstantError(null)
-    setInstantFormData({
-      interview_type: 'Python',
-      difficulty_level: 'Medium',
-      duration_minutes: 60,
-      coding_round: false,
-    })
-    setMenuOpenId(null)
-  }
-
   const handleInstantSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!instantRow?.selection || !jobDescription) return
@@ -455,8 +387,6 @@ export default function CandidatesTable({ resumes, jobDescription }: CandidatesT
             {rows.map((row) => {
               const score = row.score
               const isEval = evaluating === row.resume.id
-              const isProc = processing === row.resume.id
-              const menuOpen = menuOpenId === row.resume.id
               return (
                 <tr key={row.resume.id}>
                   <td className="td-name">{row.resume.name}</td>

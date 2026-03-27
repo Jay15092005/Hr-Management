@@ -56,7 +56,7 @@ export default function CandidateDetail() {
         .select('*')
         .eq('resume_id', resumeId)
         .eq('job_description_id', jobId)
-        .single()
+        .maybeSingle()
       setSelection(selData as CandidateSelection | null)
 
       if (selData?.id) {
@@ -64,7 +64,7 @@ export default function CandidateDetail() {
           .from('interview_configurations')
           .select('*')
           .eq('candidate_selection_id', selData.id)
-          .single()
+          .maybeSingle()
         setInterview(intData as InterviewConfiguration | null)
         if (intData?.id) {
           const { data: detData } = await supabase
