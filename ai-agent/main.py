@@ -23,8 +23,15 @@ import time
 import subprocess
 import jwt  # PyJWT for token generation
 import aiohttp
+from pathlib import Path
 from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
+
+# Repo root .env first, then ai-agent/.env (overrides for local agent-only vars)
+_AGENT_DIR = Path(__file__).resolve().parent
+_REPO_ROOT = _AGENT_DIR.parent
+load_dotenv(_REPO_ROOT / ".env")
+load_dotenv(_AGENT_DIR / ".env", override=True)
 
 from videosdk.agents import (
     Agent,
@@ -37,10 +44,19 @@ from videosdk.agents import (
 from videosdk.plugins.google import GeminiRealtime, GeminiLiveConfig
 
 # Supabase client
-from supabase import create_client, Client
+from httpx import Client as HttpxClient
+from httpx import Timeout as HttpxTimeout
+from supabase import Client, ClientOptions, create_client
 
-# Load environment variables
-load_dotenv()
+_supabase_client_http_mode_logged = False
+
+
+def _env_first_nonempty(*names: str) -> str | None:
+    for name in names:
+        raw = os.getenv(name)
+        if raw and str(raw).strip():
+            return str(raw).strip()
+    return None
 
 
 # ============================================
@@ -51,9 +67,10 @@ def generate_videosdk_token(api_key: str, secret: str, expires_in_hours: int = 2
     Generate VideoSDK JWT token from API key and secret.
     Based on: https://docs.videosdk.live/ai_agents/authentication-and-token
     """
+    # Match Edge Function `generate-videosdk-token` (allow_mod needed for agent publish/actions)
     payload = {
         "apikey": api_key,
-        "permissions": ["allow_join"],
+        "permissions": ["allow_join", "allow_mod"],
         "iat": int(time.time()),
         "exp": int(time.time()) + (expires_in_hours * 60 * 60),
     }
@@ -66,14 +83,59 @@ def generate_videosdk_token(api_key: str, secret: str, expires_in_hours: int = 2
 # Supabase Client
 # ============================================
 def get_supabase_client() -> Client:
-    """Create Supabase client from environment variables."""
-    url = os.getenv("SUPABASE_URL")
-    key = os.getenv("SUPABASE_ANON_KEY")
-    
+    """
+    Create Supabase client for the AI agent (server-side process).
+
+    Must use SUPABASE_SERVICE_ROLE_KEY: interview_configurations is protected by RLS
+    and only allows SELECT/UPDATE to authenticated HR users. The legacy anon key
+    sees zero rows, so polling would never join a room.
+
+    URL: same project as the Vite app often only defines VITE_SUPABASE_URL — we accept that too.
+    """
+    url = _env_first_nonempty("SUPABASE_URL", "VITE_SUPABASE_URL")
+    service_key = _env_first_nonempty("SUPABASE_SERVICE_ROLE_KEY")
+    anon_key = _env_first_nonempty("SUPABASE_ANON_KEY", "VITE_SUPABASE_ANON_KEY")
+    key = service_key or anon_key
+
     if not url or not key:
-        raise ValueError("SUPABASE_URL and SUPABASE_ANON_KEY are required")
-    
-    return create_client(url, key)
+        raise ValueError(
+            "Supabase URL and key are missing. Set SUPABASE_URL or VITE_SUPABASE_URL, and "
+            "SUPABASE_SERVICE_ROLE_KEY (required for polling); see ai-agent/.env.example"
+        )
+
+    if not service_key:
+        print(
+            "⚠️  SUPABASE_SERVICE_ROLE_KEY is not set; falling back to SUPABASE_ANON_KEY. "
+            "RLS will hide interview_configurations — the agent will not auto-join. "
+            "Add SUPABASE_SERVICE_ROLE_KEY to .env (server only; never expose in the browser)."
+        )
+
+    # postgrest / supabase-py default httpx client uses http2=True. On many macOS / VPN /
+    # corporate networks the first REST call never completes (no error — looks like “no polls”).
+    # Default to HTTP/1.1; set SUPABASE_HTTP2=true to opt in.
+    use_http2 = os.getenv("SUPABASE_HTTP2", "").lower() in ("1", "true", "yes")
+    sb_timeout = HttpxTimeout(60.0, connect=20.0)
+    httpx_client = HttpxClient(
+        timeout=sb_timeout,
+        http2=use_http2,
+        follow_redirects=True,
+    )
+    global _supabase_client_http_mode_logged
+    if not _supabase_client_http_mode_logged:
+        print(
+            f"📡 Supabase REST client: http2={use_http2} "
+            f"(hangs? try HTTP/1.1 — default; or set SUPABASE_HTTP2=true)",
+            flush=True,
+        )
+        _supabase_client_http_mode_logged = True
+    return create_client(
+        url,
+        key,
+        options=ClientOptions(
+            httpx_client=httpx_client,
+            postgrest_client_timeout=sb_timeout,
+        ),
+    )
 
 
 def fetch_active_interview(supabase: Client) -> dict | None:
@@ -106,7 +168,7 @@ def fetch_active_interview(supabase: Client) -> dict | None:
             )
         """) \
         .eq("status", "active") \
-        .not_.is_("room_id", "null") \
+        .not_.is_("room_id", None) \
         .order("created_at", desc=True) \
         .limit(1) \
         .execute()
@@ -140,7 +202,7 @@ def fetch_active_interview(supabase: Client) -> dict | None:
             )
         """) \
         .eq("status", "scheduled") \
-        .not_.is_("room_id", "null") \
+        .not_.is_("room_id", None) \
         .lte("scheduled_at", now) \
         .order("scheduled_at", desc=True) \
         .limit(1) \
@@ -586,11 +648,16 @@ def poll_and_join_interviews():
     """
     import time as time_module
 
+    try:
+        sys.stdout.reconfigure(line_buffering=True)
+    except Exception:
+        pass
+
     api_key = os.getenv("VIDEOSDK_API_KEY")
     secret = os.getenv("VIDEOSDK_SECRET")
 
     if not api_key or not secret:
-        print("❌ ERROR: VIDEOSDK_API_KEY and VIDEOSDK_SECRET are required")
+        print("❌ ERROR: VIDEOSDK_API_KEY and VIDEOSDK_SECRET are required", flush=True)
         return
 
     print("\n" + "=" * 60)
@@ -598,93 +665,180 @@ def poll_and_join_interviews():
     print("=" * 60)
     print("Agent will automatically join interviews when created.")
     print("Create an interview in the HR app and the agent will join!")
-    print("=" * 60 + "\n")
+    print("=" * 60 + "\n", flush=True)
+
+    sb_url_ok = bool(_env_first_nonempty("SUPABASE_URL", "VITE_SUPABASE_URL"))
+    sb_key_mode = (
+        "service_role"
+        if _env_first_nonempty("SUPABASE_SERVICE_ROLE_KEY")
+        else (
+            "anon"
+            if _env_first_nonempty("SUPABASE_ANON_KEY", "VITE_SUPABASE_ANON_KEY")
+            else "missing"
+        )
+    )
+    print(
+        f"📡 Supabase: URL configured={sb_url_ok}, key mode={sb_key_mode}",
+        flush=True,
+    )
 
     processed_room_ids: set[str] = set()
+    pending_agents: dict[str, subprocess.Popen] = {}
+    spawn_times: dict[str, float] = {}
+    idle_ticks = 0
+    supabase = get_supabase_client()
 
     while True:
         try:
-            # Connect to Supabase
-            supabase = get_supabase_client()
+            for rid, proc in list(pending_agents.items()):
+                code = proc.poll()
+                if code is None:
+                    continue
+                started = spawn_times.pop(rid, None)
+                del pending_agents[rid]
+                elapsed = (time_module.time() - started) if started else 999.0
+                if code != 0 or elapsed < 12.0:
+                    processed_room_ids.discard(rid)
+                    print(
+                        f"⚠️ Agent for room {rid} exited early (code={code}, {elapsed:.1f}s). Will retry.",
+                        flush=True,
+                    )
 
-            # Look for newest interview that needs an AI agent
+            # Light query (no nested joins): faster and less likely to trip timeouts.
+            # The child `run` process loads full interview + candidate via fetch_interview_by_room_id.
+            print("⏳ Querying interview_configurations…", flush=True)
             result = (
                 supabase.from_("interview_configurations")
                 .select(
-                    """
-                    *,
-                    candidate_selections (
-                        id,
-                        resume_id,
-                        job_description_id,
-                        resumes (
-                            id,
-                            name,
-                            email,
-                            years_of_experience,
-                            location,
-                            degree
-                        ),
-                        job_descriptions (
-                            id,
-                            title,
-                            description,
-                            required_skills
-                        )
-                    )
-                    """
+                    "id,room_id,status,interview_type,difficulty_level,"
+                    "duration_minutes,coding_round,room_created_at,created_at,candidate_selection_id"
                 )
                 .in_("status", ["scheduled", "active"])
-                .not_.is_("room_id", "null")
-                .order("created_at", desc=True)
-                .limit(1)
+                .not_.is_("room_id", None)
+                .order("room_created_at", desc=True, nullsfirst=False)
+                .order("created_at", desc=True, nullsfirst=False)
+                .limit(25)
                 .execute()
             )
 
-            if result.data and len(result.data) > 0:
-                interview_data = result.data[0]
-                room_id = interview_data.get("room_id")
+            rows = result.data or []
+            print(f"📋 Poll got {len(rows)} interview_config row(s) with room_id", flush=True)
+            interview_data = None
+            room_id = None
+            for row in rows:
+                rid = row.get("room_id")
+                if rid and rid not in processed_room_ids:
+                    interview_data = row
+                    room_id = rid
+                    break
 
-                # Skip if we've already started an agent for this room
-                if room_id in processed_room_ids:
-                    time_module.sleep(3)
-                    continue
+            if interview_data and room_id:
+                idle_ticks = 0
+                full_row = None
+                try:
+                    full_row = (
+                        supabase.from_("interview_configurations")
+                        .select(
+                            """
+                            *,
+                            candidate_selections (
+                                id,
+                                resume_id,
+                                job_description_id,
+                                resumes (
+                                    id,
+                                    name,
+                                    email,
+                                    years_of_experience,
+                                    location,
+                                    degree
+                                ),
+                                job_descriptions (
+                                    id,
+                                    title,
+                                    description,
+                                    required_skills
+                                )
+                            )
+                            """
+                        )
+                        .eq("room_id", room_id)
+                        .limit(1)
+                        .execute()
+                    )
+                    if full_row.data:
+                        interview_data = full_row.data[0]
+                except Exception as exc:
+                    print(f"⚠️ Could not load nested interview row (non-fatal): {exc}", flush=True)
 
                 candidate_selection = interview_data.get("candidate_selections", {}) or {}
                 resume = candidate_selection.get("resumes", {}) or {}
                 candidate_name = resume.get("name", "Unknown")
 
-                print("\n🎯 New interview detected!")
-                print(f"   Room ID: {room_id}")
-                print(f"   Candidate: {candidate_name}")
-                print(f"   Type: {interview_data.get('interview_type')}")
-                print(f"   Difficulty: {interview_data.get('difficulty_level')}")
+                print("\n🎯 New interview detected!", flush=True)
+                print(f"   Room ID: {room_id}", flush=True)
+                print(f"   Candidate: {candidate_name}", flush=True)
+                print(f"   Type: {interview_data.get('interview_type')}", flush=True)
+                print(f"   Difficulty: {interview_data.get('difficulty_level')}", flush=True)
 
                 processed_room_ids.add(room_id)
 
-                # Spawn a separate process that runs this script in 'run' mode
-                print("\n🚀 Spawning AI agent process for this room...")
+                agent_log = _AGENT_DIR / "agent-child.log"
+                print("\n🚀 Spawning AI agent process for this room...", flush=True)
+                print(f"   (child stdout/stderr → {agent_log})", flush=True)
                 cmd = [
                     sys.executable,
+                    "-u",
                     os.path.abspath(__file__),
                     "run",
                     f"--room-id={room_id}",
                 ]
                 try:
-                    subprocess.Popen(cmd)
-                    print("✅ Agent process started")
+                    log_f = open(agent_log, "a", encoding="utf-8", buffering=1)
+                    log_f.write(
+                        f"\n--- spawn {time_module.strftime('%Y-%m-%d %H:%M:%S')} room={room_id} ---\n"
+                    )
+                    proc = subprocess.Popen(
+                        cmd,
+                        cwd=str(_AGENT_DIR),
+                        env=os.environ.copy(),
+                        stdout=log_f,
+                        stderr=subprocess.STDOUT,
+                    )
+                    # Child holds duplicated fd; close parent's copy so we don't leak handles per tick
+                    log_f.close()
+                    pending_agents[room_id] = proc
+                    spawn_times[room_id] = time_module.time()
+                    print(f"✅ Agent process started (pid={proc.pid})", flush=True)
                 except Exception as e:
-                    print(f"❌ Failed to start agent process: {e}")
+                    processed_room_ids.discard(room_id)
+                    print(f"❌ Failed to start agent process: {e}", flush=True)
             else:
-                print("⏳ No scheduled interviews. Waiting for new interview...")
+                idle_ticks += 1
+                if not rows:
+                    print(
+                        "⏳ Poll: no rows with status scheduled/active and a room_id yet.",
+                        flush=True,
+                    )
+                elif room_id is None and rows:
+                    print(
+                        f"⏳ Poll: {len(rows)} open room(s) but all are already being handled "
+                        f"(restart ./start.sh to reset, or create a new instant interview).",
+                        flush=True,
+                    )
+                if idle_ticks == 1 or idle_ticks % 20 == 0:
+                    print(
+                        f"   Tip: tail -f {_AGENT_DIR / 'agent-child.log'} for agent join errors.",
+                        flush=True,
+                    )
 
             time_module.sleep(3)
 
         except KeyboardInterrupt:
-            print("\n👋 Agent stopped by user")
+            print("\n👋 Agent stopped by user", flush=True)
             break
         except Exception as e:
-            print(f"⚠️ Error: {e}")
+            print(f"⚠️ Error: {e}", flush=True)
             time_module.sleep(3)
 
 
@@ -791,7 +945,7 @@ def main():
                 sys.exit(1)
         except Exception as e:
             print(f"❌ Error connecting to Supabase: {e}")
-            print("\nMake sure SUPABASE_URL and SUPABASE_ANON_KEY are set in .env")
+            print("\nMake sure SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set in .env")
             sys.exit(1)
 
     # Apply CLI overrides

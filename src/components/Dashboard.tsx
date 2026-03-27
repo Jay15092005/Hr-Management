@@ -12,16 +12,8 @@ import './Dashboard.css'
 
 type Section = 'upload' | 'list' | 'description' | 'workflow' | 'meetings' | 'forms'
 
-function getDateDisplay() {
-  const d = new Date()
-  const day = d.getDate()
-  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-  const dayName = days[d.getDay()]
-  const start = new Date(d.getFullYear(), 0, 1)
-  const diff = Math.floor((d.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
-  const weekNum = Math.ceil((diff + start.getDay() + 1) / 7)
-  return `${day} ${dayName} Day ${diff + 1}/365 Week ${weekNum}/52`
-}
+const APP_BRAND_NAME =
+  import.meta.env.VITE_APP_BRAND_NAME?.trim() || 'AI Interview System'
 
 export default function Dashboard() {
   const [activeSection, setActiveSection] = useState<Section>('workflow')
@@ -51,7 +43,7 @@ export default function Dashboard() {
     <div className="dashboard-container">
       <header className="dashboard-header-bar">
         <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', flexWrap: 'wrap' }}>
-          <div className="header-date">{getDateDisplay()}</div>
+          <div className="header-brand">{APP_BRAND_NAME}</div>
           <div className="dashboard-user-bar" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <span style={{ fontSize: '0.85rem', color: '#555' }} title={user?.email ?? ''}>
               {user?.email ?? 'HR'}

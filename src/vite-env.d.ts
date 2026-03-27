@@ -1,6 +1,8 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
+  /** Header / company name shown on the dashboard (default: AI Interview System). */
+  readonly VITE_APP_BRAND_NAME?: string
   readonly VITE_CLERK_PUBLISHABLE_KEY: string
   /** Must match the Clerk JWT template name used for Supabase (default: "supabase"). */
   readonly VITE_CLERK_SUPABASE_JWT_TEMPLATE?: string

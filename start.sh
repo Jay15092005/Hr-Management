@@ -108,15 +108,15 @@ else
     "$VENV_PYTHON" -m pip install -r requirements.txt
 fi
 
-# Check if .env exists
-if [ ! -f ".env" ]; then
-    echo -e "${RED}⚠️  Warning: ai-agent/.env file not found${NC}"
-    echo -e "${YELLOW}   Copy .env.example to .env and add your credentials${NC}"
+# Check if .env exists (main.py also loads repo-root .env for SUPABASE_SERVICE_ROLE_KEY, etc.)
+if [ ! -f ".env" ] && [ ! -f "$SCRIPT_DIR/.env" ]; then
+    echo -e "${RED}⚠️  Warning: no .env in ai-agent/ or project root${NC}"
+    echo -e "${YELLOW}   Add SUPABASE_SERVICE_ROLE_KEY (required for agent auto-join; see ai-agent/.env.example)${NC}"
 fi
 
-# Start AI agent in background
+# Start AI agent in background (unbuffered stdout so poll logs appear under ./start.sh)
 # Use the python executable from the venv directly to ensure correct environment
-"$VENV_PYTHON" main.py &
+PYTHONUNBUFFERED=1 "$VENV_PYTHON" main.py &
 AGENT_PID=$!
 echo -e "${GREEN}✅ AI Agent started (PID: $AGENT_PID)${NC}"
 

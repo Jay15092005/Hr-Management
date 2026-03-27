@@ -2,10 +2,6 @@
 description: 
 alwaysApply: true
 ---
-
--- WARNING: This schema is for context only and is not meant to be run.
--- Table order and constraints may not be valid for execution.
-
 -- WARNING: This schema is for context only and is not meant to be run.
 -- Table order and constraints may not be valid for execution.
 
@@ -40,11 +36,10 @@ CREATE TABLE public.cheating_detections (
   CONSTRAINT cheating_detections_interview_id_fkey FOREIGN KEY (interview_id) REFERENCES public.interview_configurations(id)
 );
 CREATE TABLE public.hr_profiles (
-  id uuid NOT NULL,
+  id text NOT NULL,
   email text,
   created_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT hr_profiles_pkey PRIMARY KEY (id),
-  CONSTRAINT hr_profiles_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id)
+  CONSTRAINT hr_profiles_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.interview_configurations (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -86,7 +81,7 @@ CREATE TABLE public.interviews (
 );
 CREATE TABLE public.job_application_links (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
-  owner_id uuid NOT NULL,
+  owner_id text NOT NULL,
   job_description_id uuid NOT NULL,
   title text,
   slug text NOT NULL UNIQUE,
@@ -97,19 +92,17 @@ CREATE TABLE public.job_application_links (
   custom_requirements text,
   additional_details text,
   CONSTRAINT job_application_links_pkey PRIMARY KEY (id),
-  CONSTRAINT job_application_links_owner_id_fkey FOREIGN KEY (owner_id) REFERENCES auth.users(id),
   CONSTRAINT job_application_links_job_description_id_fkey FOREIGN KEY (job_description_id) REFERENCES public.job_descriptions(id)
 );
 CREATE TABLE public.job_application_submissions (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   link_id uuid NOT NULL,
-  owner_id uuid NOT NULL,
+  owner_id text NOT NULL,
   resume_id uuid NOT NULL,
   candidate_email text NOT NULL,
   submitted_at timestamp with time zone NOT NULL DEFAULT now(),
   CONSTRAINT job_application_submissions_pkey PRIMARY KEY (id),
   CONSTRAINT job_application_submissions_link_id_fkey FOREIGN KEY (link_id) REFERENCES public.job_application_links(id),
-  CONSTRAINT job_application_submissions_owner_id_fkey FOREIGN KEY (owner_id) REFERENCES auth.users(id),
   CONSTRAINT job_application_submissions_resume_id_fkey FOREIGN KEY (resume_id) REFERENCES public.resumes(id)
 );
 CREATE TABLE public.job_descriptions (
@@ -123,9 +116,8 @@ CREATE TABLE public.job_descriptions (
   is_active boolean DEFAULT true,
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
-  owner_id uuid,
-  CONSTRAINT job_descriptions_pkey PRIMARY KEY (id),
-  CONSTRAINT job_descriptions_owner_id_fkey FOREIGN KEY (owner_id) REFERENCES auth.users(id)
+  owner_id text,
+  CONSTRAINT job_descriptions_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.meeting_transcription_webhooks (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -177,8 +169,7 @@ CREATE TABLE public.resumes (
   years_of_experience integer DEFAULT 0,
   location character varying,
   degree character varying,
-  owner_id uuid,
+  owner_id text,
   storage_object_path text,
-  CONSTRAINT resumes_pkey PRIMARY KEY (id),
-  CONSTRAINT resumes_owner_id_fkey FOREIGN KEY (owner_id) REFERENCES auth.users(id)
+  CONSTRAINT resumes_pkey PRIMARY KEY (id)
 );
