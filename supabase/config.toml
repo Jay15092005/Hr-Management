@@ -26,6 +26,9 @@ verify_jwt = false
 [functions.import-meeting-transcript]
 verify_jwt = false
 
+[functions.fetch-videosdk-recordings]
+verify_jwt = false
+
 [functions.confirm-interview-slot]
 verify_jwt = false
 
