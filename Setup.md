@@ -17,32 +17,6 @@ This guide will help you set up the HR Management System with VideoSDK interview
 
 Create a `.env` file in the root directory with the following variables:
 
-```env
-# Supabase Configuration
-VITE_SUPABASE_URL=https://fvsywwknwfeyvxvjlmmd.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ2c3l3d2tud2ZleXZ4dmpsbW1kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkxNjg0OTIsImV4cCI6MjA4NDc0NDQ5Mn0.AJ4c8W7OaAP0RuoJlxfY4cAvxsGyMm7f-qmdZyB31-Y
-
-# Backend/Server-side only (DO NOT expose in frontend)
-# SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ2c3l3d2tud2ZleXZ4dmpsbW1kIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2OTE2ODQ5MiwiZXhwIjoyMDg0NzQ0NDkyfQ.Vj93IqqP7c_2xGDRUKxmzedOXyfuchkNcAWpdP_9A40
-
-# Project ID (for reference)
-VITE_SUPABASE_PROJECT_ID=fvsywwknwfeyvxvjlmmd
-
-# Google Gemini API Key
-VITE_GEMINI_API_KEY=AIzaSyBOEc_n9mcIpsfeAmHsLHcS3pjVWmOa3dE
-
-# Optional: Specify Gemini model (default: gemini-2.5-flash)
-# Options: gemini-2.5-flash (fast, cost-effective) or gemini-2.5-pro (more powerful)
-VITE_GEMINI_MODEL=gemini-2.5-flash
-
-# Resend API Key (for email sending)
-# Get your API key from: https://resend.com/api-keys
-RESEND_API_KEY=re_Zrv66vmv_HoYSU2XcsT7FDtrSjqHd8quS
-
-VITE_VIDEOSDK_API_KEY=cda74377-c6f8-464a-b7d2-9387c987e491
-VITE_VIDEOSDK_SECRET=ea90f73abcf16af8dbc7c15b7c21d3a62d41f692aafa70aa3e6ae0c7c7e4f585
-```
-
 ### 🔐 Getting Your API Keys
 
 #### Supabase
