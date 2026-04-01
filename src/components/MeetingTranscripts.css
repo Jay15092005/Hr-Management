@@ -84,6 +84,101 @@
   opacity: 0.5;
   cursor: default;
 }
+.mt-btn-primary {
+  background: #1a56db;
+  border-color: #1a56db;
+  color: #fff;
+}
+.mt-btn-primary:hover:not(:disabled) {
+  background: #1547b8;
+  border-color: #1547b8;
+}
+.mt-btn-small {
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  padding: 0.35rem 0.65rem;
+}
+
+.mt-recordings-card {
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1rem;
+}
+.mt-recordings-header {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+.mt-recordings-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #222;
+}
+.mt-recordings-hint {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #666;
+  line-height: 1.45;
+  max-width: 52rem;
+}
+.mt-recordings-hint a {
+  color: #1a56db;
+}
+.mt-recordings-error {
+  margin-top: 0.75rem;
+}
+.mt-recordings-empty {
+  margin-top: 0.75rem;
+}
+.mt-recordings-pageinfo {
+  margin: 0.75rem 0 0;
+  font-size: 0.78rem;
+  color: #888;
+}
+.mt-recordings-list {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+.mt-recording-item {
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+  background: #fafbfc;
+}
+.mt-recording-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin-bottom: 0.65rem;
+}
+.mt-recording-sub {
+  font-size: 0.78rem;
+  color: #666;
+}
+.mt-recording-player-wrap {
+  max-width: 100%;
+}
+.mt-recording-video {
+  width: 100%;
+  max-height: 420px;
+  border-radius: 6px;
+  background: #111;
+}
+.mt-recording-actions {
+  margin-top: 0.4rem;
+}
+.mt-link {
+  font-size: 0.8rem;
+  color: #1a56db;
+}
 
 .mt-info {
   margin-top: 1rem;

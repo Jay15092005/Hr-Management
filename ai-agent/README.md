@@ -118,9 +118,10 @@ python main.py --interview-type=React --difficulty=Hard
 VIDEOSDK_API_KEY=cda74377-c6f8-464a-b7d2-9387c987e491
 VIDEOSDK_SECRET=ea90f73abcf16af8dbc7c15b7c21d3a62d41f692aafa70aa3e6ae0c7c7e4f585
 
-# Supabase (for auto-detecting interviews)
-SUPABASE_URL=https://fvsywwknwfeyvxvjlmmd.supabase.co
-SUPABASE_ANON_KEY=eyJhbGciOiJI...
+# Supabase — use SERVICE ROLE for the agent (bypasses RLS on interview rows; never ship to the browser)
+# You may use only VITE_SUPABASE_URL from the frontend .env; the agent picks that up too.
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJI...
 
 # Google Gemini
 GOOGLE_API_KEY=AIzaSy...
@@ -156,8 +157,12 @@ Puck, Charon, Kore, Fenrir, Aoede, **Leda** (default), Orus, Zephyr
 - Create an instant interview from the HR app first
 - Or use `--room-id=xxx` to join a specific room
 
+### Agent never joins / polling shows no interviews
+- Set **SUPABASE_SERVICE_ROLE_KEY** in `.env`. The anon key cannot read `interview_configurations` under RLS, so polling returns no rows while candidates can still join via `interview_join_context`.
+- You can put credentials in the repo-root `.env` or `ai-agent/.env` (both are loaded).
+
 ### "Error connecting to Supabase"
-- Check SUPABASE_URL and SUPABASE_ANON_KEY in .env
+- Check `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in `.env`
 
 ### "Token generation failed"
 - Verify VIDEOSDK_API_KEY and VIDEOSDK_SECRET

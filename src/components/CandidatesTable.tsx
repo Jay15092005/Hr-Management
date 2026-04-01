@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import {
+  getResumeReadableUrl,
+  resumeHasDownloadableFile,
   supabase,
   type Resume,
   type JobDescription,
@@ -12,6 +14,7 @@ import {
 import { getGeminiService } from '../lib/gemini'
 import { extractResumeTextFromUrl } from '../utils/resumeParser'
 import InterviewScheduler from './InterviewScheduler'
+import ResumeFileLink from './ResumeFileLink'
 import './CandidatesTable.css'
 
 interface RowData {
@@ -119,7 +122,7 @@ export default function CandidatesTable({ resumes, jobDescription }: CandidatesT
   }, [jobDescription?.id, resumeIdsKey])
 
   const evaluateResume = async (resume: Resume, retryCount = 0) => {
-    if (!jobDescription || !resume.resume_file_url) return
+    if (!jobDescription || !resumeHasDownloadableFile(resume)) return
     setEvaluating(resume.id)
     setError(null)
     try {
@@ -142,7 +145,9 @@ export default function CandidatesTable({ resumes, jobDescription }: CandidatesT
       // Extract text from resume (PDF, DOCX, TXT)
       let resumeText = ''
       try {
-        resumeText = await extractResumeTextFromUrl(resume.resume_file_url)
+        const fileUrl = await getResumeReadableUrl(resume)
+        if (!fileUrl) throw new Error('No file URL')
+        resumeText = await extractResumeTextFromUrl(fileUrl)
       } catch {
         // Fallback to basic candidate info if extraction fails
         resumeText = `Candidate Name: ${resume.name}\nEmail: ${resume.email}\nExperience: ${resume.years_of_experience || 0} years\nLocation: ${resume.location || 'Not specified'}\nDegree: ${resume.degree || 'Not specified'}`
@@ -202,7 +207,7 @@ export default function CandidatesTable({ resumes, jobDescription }: CandidatesT
     try {
       for (let i = 0; i < resumes.length; i++) {
         const r = resumes[i]
-        if (r.resume_file_url) await evaluateResume(r)
+        if (resumeHasDownloadableFile(r)) await evaluateResume(r)
         if (i < resumes.length - 1)
           await new Promise((resolve) => setTimeout(resolve, 3000))
       }
@@ -260,74 +265,6 @@ export default function CandidatesTable({ resumes, jobDescription }: CandidatesT
       setProcessing(null)
       setMenuOpenId(null)
     }
-  }
-
-  const handleSelect = async (row: RowData) => {
-    if (!jobDescription) return
-    setProcessing(row.resume.id)
-    setError(null)
-    try {
-      await supabase.from('candidate_selections').upsert(
-        {
-          resume_id: row.resume.id,
-          job_description_id: jobDescription.id,
-          status: 'selected',
-          selected_at: new Date().toISOString(),
-        },
-        { onConflict: 'resume_id,job_description_id' }
-      )
-      // Navigate to detail page after selecting
-      navigate(`/candidate/${jobDescription.id}/${row.resume.id}`)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed')
-    } finally {
-      setProcessing(null)
-      setMenuOpenId(null)
-    }
-  }
-
-  const handleReject = async (row: RowData) => {
-    if (!jobDescription) return
-    setProcessing(row.resume.id)
-    setError(null)
-    try {
-      await supabase.from('candidate_selections').upsert(
-        {
-          resume_id: row.resume.id,
-          job_description_id: jobDescription.id,
-          status: 'rejected',
-          rejected_at: new Date().toISOString(),
-          email_sent: false,
-          email_sent_at: null,
-        },
-        { onConflict: 'resume_id,job_description_id' }
-      )
-      await fetchData()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed')
-    } finally {
-      setProcessing(null)
-      setMenuOpenId(null)
-    }
-  }
-
-  const handleScheduleInterview = (row: RowData) => {
-    if (!row.selection) return
-    setSchedulingRow(row)
-    setMenuOpenId(null)
-  }
-
-  const handleInstantInterview = (row: RowData) => {
-    if (!row.selection) return
-    setInstantRow(row)
-    setInstantError(null)
-    setInstantFormData({
-      interview_type: 'Python',
-      difficulty_level: 'Medium',
-      duration_minutes: 60,
-      coding_round: false,
-    })
-    setMenuOpenId(null)
   }
 
   const handleInstantSubmit = async (e: React.FormEvent) => {
@@ -450,20 +387,13 @@ export default function CandidatesTable({ resumes, jobDescription }: CandidatesT
             {rows.map((row) => {
               const score = row.score
               const isEval = evaluating === row.resume.id
-              const isProc = processing === row.resume.id
-              const menuOpen = menuOpenId === row.resume.id
               return (
                 <tr key={row.resume.id}>
                   <td className="td-name">{row.resume.name}</td>
                   <td>
-                    <a
-                      href={row.resume.resume_file_url || '#'}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="link-resume"
-                    >
+                    <ResumeFileLink resume={row.resume} className="link-resume">
                       View Resume
-                    </a>
+                    </ResumeFileLink>
                   </td>
                   <td>
                     {score ? (
@@ -478,7 +408,7 @@ export default function CandidatesTable({ resumes, jobDescription }: CandidatesT
                         type="button"
                         className="btn-evaluate-one"
                         onClick={() => evaluateResume(row.resume)}
-                        disabled={!row.resume.resume_file_url || isEval || evaluatingAll}
+                        disabled={!resumeHasDownloadableFile(row.resume) || isEval || evaluatingAll}
                       >
                         {isEval ? 'Evaluating…' : 'Evaluate'}
                       </button>

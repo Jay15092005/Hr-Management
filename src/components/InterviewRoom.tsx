@@ -7,7 +7,7 @@ import {
 } from '@videosdk.live/react-sdk'
 import { Constants, useTranscription } from '@videosdk.live/react-sdk'
 import { supabase } from '../lib/supabase'
-import { validateVideoSDKRoom, getMeetingJoinUrl } from '../utils/videosdk'
+import CheatingDetector from './CheatingDetector'
 import './InterviewRoom.css'
 
 interface InterviewRoomProps {
@@ -46,23 +46,23 @@ const getVideoSDKToken = async (): Promise<string | null> => {
 }
 
 function Controls() {
-  const { leave, toggleMic, toggleWebcam, micEnabled, webcamEnabled } = useMeeting()
+  const { leave, toggleMic, toggleWebcam, localMicOn, localWebcamOn } = useMeeting()
 
   return (
     <div className="meeting-controls">
       <button
         onClick={() => toggleMic()}
-        className={`control-btn ${micEnabled ? 'active' : 'inactive'}`}
-        title={micEnabled ? 'Mute Microphone' : 'Unmute Microphone'}
+        className={`control-btn ${localMicOn ? 'active' : 'inactive'}`}
+        title={localMicOn ? 'Mute Microphone' : 'Unmute Microphone'}
       >
-        {micEnabled ? '🎤' : '🔇'}
+        {localMicOn ? '🎤' : '🔇'}
       </button>
       <button
         onClick={() => toggleWebcam()}
-        className={`control-btn ${webcamEnabled ? 'active' : 'inactive'}`}
-        title={webcamEnabled ? 'Turn Off Camera' : 'Turn On Camera'}
+        className={`control-btn ${localWebcamOn ? 'active' : 'inactive'}`}
+        title={localWebcamOn ? 'Turn Off Camera' : 'Turn On Camera'}
       >
-        {webcamEnabled ? '📹' : '📷'}
+        {localWebcamOn ? '📹' : '📷'}
       </button>
       <button onClick={() => leave()} className="control-btn leave-btn" title="Leave Meeting">
         🚪 Leave
@@ -71,9 +71,16 @@ function Controls() {
   )
 }
 
-function ParticipantView({ participantId }: { participantId: string }) {
+function ParticipantView({ participantId, roomId }: { participantId: string; roomId: string }) {
   const micRef = useRef<HTMLAudioElement>(null)
-  const { micStream, webcamOn, micOn, isLocal, displayName } = useParticipant(participantId)
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const [videoElement, setVideoElement] = useState<HTMLVideoElement | null>(null)
+  const { micStream, webcamStream, webcamOn, micOn, isLocal, displayName } = useParticipant(participantId)
+
+  // Run cheating detection on LOCAL participant so the candidate sees warnings on their own feed.
+  // (Previously it ran on remote only, so only observers saw the overlay.)
+  const testMode = import.meta.env.VITE_CHEATING_DETECTION_TEST_MODE === 'true'
+  const shouldEnableDetection = testMode ? true : isLocal
 
   useEffect(() => {
     if (micRef.current) {
@@ -91,6 +98,19 @@ function ParticipantView({ participantId }: { participantId: string }) {
     }
   }, [micStream, micOn])
 
+  // Handle webcam stream for cheating detection (local = candidate's own feed)
+  useEffect(() => {
+    if (videoRef.current && webcamOn && webcamStream) {
+      const mediaStream = new MediaStream()
+      mediaStream.addTrack(webcamStream.track)
+      videoRef.current.srcObject = mediaStream
+      videoRef.current.play().catch((error) => console.error('Video play failed:', error))
+
+      // Pass video element for both local (candidate) and remote; detector runs when shouldEnableDetection is true
+      setVideoElement(videoRef.current)
+    }
+  }, [webcamStream, webcamOn])
+
   return (
     <div className="participant-view">
       <div className="participant-info">
@@ -101,16 +121,35 @@ function ParticipantView({ participantId }: { participantId: string }) {
         </div>
       </div>
       {webcamOn ? (
-        <VideoPlayer
-          participantId={participantId}
-          type="video"
-          containerStyle={{
-            height: '100%',
-            width: '100%',
-            borderRadius: '8px',
-          }}
-          className="video-player"
-        />
+        <>
+          <VideoPlayer
+            participantId={participantId}
+            type="video"
+            containerStyle={{
+              height: '100%',
+              width: '100%',
+              borderRadius: '8px',
+            }}
+            className="video-player"
+          />
+          {/* Hidden video for cheating detection. Run on LOCAL so the candidate sees "Look up" etc. on their own tile. */}
+          {shouldEnableDetection && (
+            <>
+              <video
+                ref={videoRef}
+                style={{ display: 'none' }}
+                autoPlay
+                playsInline
+                muted
+              />
+              <CheatingDetector
+                videoElement={videoElement}
+                roomId={roomId}
+                enabled={shouldEnableDetection && !!videoElement}
+              />
+            </>
+          )}
+        </>
       ) : (
         <div className="no-video-placeholder">
           <div className="avatar">{displayName?.[0]?.toUpperCase() || '?'}</div>
@@ -122,7 +161,7 @@ function ParticipantView({ participantId }: { participantId: string }) {
   )
 }
 
-function MeetingView({ roomId, candidateName, onLeave }: InterviewRoomProps) {
+function MeetingView({ roomId, onLeave }: Pick<InterviewRoomProps, 'roomId' | 'onLeave'>) {
   const [joined, setJoined] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [roomValid, setRoomValid] = useState<boolean | null>(null)
@@ -184,41 +223,32 @@ function MeetingView({ roomId, candidateName, onLeave }: InterviewRoomProps) {
   useEffect(() => {
     const validateRoom = async () => {
       try {
-        // First check if interview exists in database
-        const { data: interviewConfig, error: dbError } = await supabase
-          .from('interview_configurations')
-          .select('status, room_id')
-          .eq('room_id', roomId)
-          .single()
+        const { data, error: dbError } = await supabase.rpc('interview_join_context', {
+          p_room_id: roomId,
+        })
 
-        if (dbError || !interviewConfig) {
+        if (dbError || data == null) {
           console.error('Interview not found in database:', dbError)
           setRoomValid(false)
           setError('Interview room not found. Please check the link and try again.')
           return
         }
 
-        // For instant interviews (status: 'active'), allow joining immediately
+        const interviewConfig = data as { status?: string; room_id?: string | null }
         if (interviewConfig.status === 'active') {
           console.log('Instant interview found - allowing join')
           setRoomValid(true)
           return
         }
 
-        // For scheduled interviews, check if it's time
         if (interviewConfig.status === 'scheduled') {
-          // Allow joining - VideoSDK SDK will handle connection
-          // The room might be created 5 minutes before, so allow joining
           setRoomValid(true)
           return
         }
 
-        // For other statuses, allow joining - let VideoSDK SDK handle it
         setRoomValid(true)
       } catch (err) {
         console.error('Error validating room:', err)
-        // If validation fails but we have roomId, allow joining anyway
-        // VideoSDK SDK will handle connection errors
         setRoomValid(true)
       }
     }
@@ -244,39 +274,44 @@ function MeetingView({ roomId, candidateName, onLeave }: InterviewRoomProps) {
         )
       }
 
-      // Start recording with post-transcription config
-      try {
-        const webhookUrl = import.meta.env.VITE_VIDEOSDK_WEBHOOK_URL || null
-        const transcriptionConfig: any = {
-          enabled: true,
-          summary: {
+      // Start recording with post-transcription config (optional)
+      // Disabled by default to avoid codec errors - enable with VITE_ENABLE_RECORDING=true
+      const enableRecording = import.meta.env.VITE_ENABLE_RECORDING === 'true'
+      if (enableRecording) {
+        try {
+          const webhookUrl = import.meta.env.VITE_VIDEOSDK_WEBHOOK_URL || null
+          const transcriptionConfig: any = {
             enabled: true,
-            prompt:
-              import.meta.env.VITE_TRANSCRIPTION_SUMMARY_PROMPT ||
-              'Write summary in sections like Title, Agenda, Speakers, Action Items, Outlines, Notes and Summary',
-          },
+            summary: {
+              enabled: true,
+              prompt:
+                import.meta.env.VITE_TRANSCRIPTION_SUMMARY_PROMPT ||
+                'Write summary in sections like Title, Agenda, Speakers, Action Items, Outlines, Notes and Summary',
+            },
+          }
+          console.log('[Recording] startRecording called', {
+            webhookUrl,
+            hasPrompt: !!transcriptionConfig.summary.prompt,
+          })
+          // Optional webhook/layout: pass undefined for unused slots (typed API)
+          startRecording(webhookUrl ?? undefined, undefined, undefined, transcriptionConfig)
+        } catch (e) {
+          console.error('[Recording] Failed to start recording with transcription:', e)
         }
-        console.log('[Recording] startRecording called', {
-          webhookUrl,
-          hasPrompt: !!transcriptionConfig.summary.prompt,
-        })
-        // If you don't have a webhookUrl or awsDirPath, you should pass null (per VideoSDK docs)
-        startRecording(webhookUrl, null, null, transcriptionConfig)
-      } catch (e) {
-        console.error('[Recording] Failed to start recording with transcription:', e)
+      } else {
+        console.log('[Recording] Recording disabled (set VITE_ENABLE_RECORDING=true to enable)')
       }
     },
     onMeetingLeft: () => {
       // Mark interview as completed in Supabase (if it exists)
-      ;(async () => {
+      ; (async () => {
         try {
           console.log('[InterviewRoom] Marking interview completed for room', roomId)
-          const { error: updateError } = await supabase
-            .from('interview_configurations')
-            .update({ status: 'completed', updated_at: new Date().toISOString() })
-            .eq('room_id', roomId)
-          if (updateError) {
-            console.error('[InterviewRoom] Failed to mark interview completed:', updateError)
+          const { error: rpcError } = await supabase.rpc('complete_interview_by_room', {
+            p_room_id: roomId,
+          })
+          if (rpcError) {
+            console.error('[InterviewRoom] Failed to mark interview completed:', rpcError)
           }
         } catch (e) {
           console.error('[InterviewRoom] Exception while marking interview completed:', e)
@@ -291,12 +326,15 @@ function MeetingView({ roomId, candidateName, onLeave }: InterviewRoomProps) {
         }
       }
 
-      // Stop recording when meeting ends
-      try {
-        console.log('[Recording] stopRecording called')
-        stopRecording()
-      } catch (e) {
-        console.error('[Recording] Failed to stop recording:', e)
+      // Stop recording when meeting ends (if it was enabled)
+      const enableRecording = import.meta.env.VITE_ENABLE_RECORDING === 'true'
+      if (enableRecording) {
+        try {
+          console.log('[Recording] stopRecording called')
+          stopRecording()
+        } catch (e) {
+          console.error('[Recording] Failed to stop recording:', e)
+        }
       }
 
       onLeave()
@@ -357,7 +395,7 @@ function MeetingView({ roomId, candidateName, onLeave }: InterviewRoomProps) {
           <Controls />
           <div className="participants-grid">
             {[...participants.keys()].map((participantId) => (
-              <ParticipantView key={participantId} participantId={participantId} />
+              <ParticipantView key={participantId} participantId={participantId} roomId={roomId} />
             ))}
           </div>
         </div>
@@ -437,10 +475,11 @@ export default function InterviewRoom({ roomId, candidateName, onLeave }: Interv
         micEnabled: true,
         webcamEnabled: true,
         name: candidateName,
+        debugMode: false,
       }}
       token={token}
     >
-      <MeetingView roomId={roomId} candidateName={candidateName} onLeave={onLeave} />
+      <MeetingView roomId={roomId} onLeave={onLeave} />
     </MeetingProvider>
   )
 }

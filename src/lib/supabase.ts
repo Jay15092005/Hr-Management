@@ -10,7 +10,20 @@ if (!supabaseUrl || !supabaseAnonKey) {
   )
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+/** Set by AuthProvider: Clerk session JWT for Supabase third-party auth (see Supabase + Clerk docs). */
+let clerkAccessTokenGetter: () => Promise<string | null> = async () => null
+
+export function setClerkSupabaseAccessToken(getter: () => Promise<string | null>) {
+  clerkAccessTokenGetter = getter
+}
+
+/**
+ * Single client for the app. Uses Clerk session tokens when signed in; `auth` namespace is not used
+ * (Supabase requirement when `accessToken` is set).
+ */
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  accessToken: () => clerkAccessTokenGetter(),
+})
 
 export interface Resume {
   id: string
@@ -19,6 +32,10 @@ export interface Resume {
   date_of_application: string
   resume_file_url: string | null
   resume_file_name: string | null
+  /** Path in `resumes` bucket, e.g. `{userId}/file.pdf` — used with signed URLs when bucket is private */
+  storage_object_path?: string | null
+  /** Owning HR (auth user id); set by DB trigger on insert */
+  owner_id?: string | null
   years_of_experience: number | null
   location: string | null
   degree: string | null
@@ -35,8 +52,24 @@ export interface JobDescription {
   location: string | null
   degree_required: string | null
   is_active: boolean
+  owner_id?: string | null
   created_at: string
   updated_at: string
+}
+
+export interface JobApplicationLink {
+  id: string
+  owner_id: string
+  job_description_id: string
+  title: string | null
+  custom_requirements?: string | null
+  additional_details?: string | null
+  slug: string
+  expires_at: string
+  is_active: boolean
+  created_at: string
+  updated_at: string
+  job_descriptions?: JobDescription
 }
 
 export interface ResumeScore {
@@ -94,8 +127,36 @@ export interface CandidateWithScore extends Resume {
 // Storage bucket name
 export const RESUMES_BUCKET = 'resumes'
 
+/** True if the resume row has either a legacy public URL or a private storage path */
+export function resumeHasDownloadableFile(
+  r: Pick<Resume, 'storage_object_path' | 'resume_file_url'>
+): boolean {
+  return Boolean(r.storage_object_path?.trim() || r.resume_file_url?.trim())
+}
+
 /**
- * Get public URL for a resume file stored in Supabase Storage
+ * Signed URL for private bucket objects, or legacy public URL.
+ */
+export async function getResumeReadableUrl(
+  r: Pick<Resume, 'storage_object_path' | 'resume_file_url'>
+): Promise<string | null> {
+  const path = r.storage_object_path?.trim()
+  if (path) {
+    const { data, error } = await supabase.storage
+      .from(RESUMES_BUCKET)
+      .createSignedUrl(path, 3600)
+    if (error || !data?.signedUrl) {
+      console.error('createSignedUrl failed:', error)
+      return null
+    }
+    return data.signedUrl
+  }
+  if (r.resume_file_url?.trim()) return r.resume_file_url
+  return null
+}
+
+/**
+ * Get public URL for a resume file stored in Supabase Storage (legacy / public buckets only)
  */
 export const getResumePublicUrl = (filePath: string): string => {
   const { data } = supabase.storage.from(RESUMES_BUCKET).getPublicUrl(filePath)

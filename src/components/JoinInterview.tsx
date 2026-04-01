@@ -18,34 +18,21 @@ export default function JoinInterview() {
       return
     }
 
-    // Try to fetch candidate name from interview configuration
+    // Candidate join uses RPC (RLS blocks direct table reads for anon)
     const fetchInterviewInfo = async () => {
       try {
-        // Check if interview exists - don't filter by status for instant interviews
-        const { data: interviewConfig, error: configError } = await supabase
-          .from('interview_configurations')
-          .select(`
-            *,
-            candidate_selections!inner (
-              resumes!inner (
-                name,
-                email
-              )
-            )
-          `)
-          .eq('room_id', roomId)
-          .single()
+        const { data, error: rpcError } = await supabase.rpc('interview_join_context', {
+          p_room_id: roomId,
+        })
 
-        if (!configError && interviewConfig) {
-          const resume = interviewConfig.candidate_selections?.resumes
-          if (resume?.name) {
-            setCandidateName(resume.name)
-          }
-          // If interview exists in database, it's valid (even if status is not 'active' yet)
-          // The InterviewRoom component will handle VideoSDK validation
-        } else {
-          // If interview not found in database, set error
+        if (rpcError || data == null) {
           setError('Interview room not found')
+          return
+        }
+
+        const ctx = data as { candidate_name?: string | null }
+        if (ctx.candidate_name) {
+          setCandidateName(ctx.candidate_name)
         }
       } catch (err) {
         console.error('Error fetching interview info:', err)

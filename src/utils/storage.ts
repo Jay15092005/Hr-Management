@@ -46,11 +46,21 @@ export async function uploadResume(
       }
     }
 
-    // Generate unique file path
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) {
+      return {
+        success: false,
+        error: 'You must be signed in to upload resumes.',
+      }
+    }
+
+    // Generate unique file path (scoped to HR user for RLS + isolation)
     const fileExt = file.name.split('.').pop()
     const sanitizedName = candidateName.replace(/[^a-z0-9]/gi, '_').toLowerCase()
     const timestamp = Date.now()
-    const filePath = `${sanitizedName}_${timestamp}.${fileExt}`
+    const filePath = `${user.id}/${sanitizedName}_${timestamp}.${fileExt}`
 
     // Upload to Supabase Storage
     const { data, error } = await supabase.storage
@@ -68,15 +78,11 @@ export async function uploadResume(
       }
     }
 
-    // Get public URL
-    const { data: urlData } = supabase.storage
-      .from(RESUMES_BUCKET)
-      .getPublicUrl(data.path)
-
+    // Private bucket: callers should persist `path` as storage_object_path and use signed URLs
     return {
       success: true,
       path: data.path,
-      url: urlData.publicUrl,
+      url: '',
     }
   } catch (error) {
     console.error('Upload error:', error)

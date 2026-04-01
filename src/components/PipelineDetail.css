@@ -533,6 +533,72 @@
   white-space: nowrap;
 }
 
+/* ── Cheating detection (after meeting) ── */
+.pd-cheating-section {
+  border-top: 1px solid #e8e8e8;
+  padding-top: 1rem;
+}
+
+.pd-detections-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.75rem;
+}
+
+.pd-detection-pill {
+  background: #e3f2fd;
+  color: #1565c0;
+  padding: 0.3rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.pd-detections-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  margin-top: 0.5rem;
+}
+
+.pd-detections-table th,
+.pd-detections-table td {
+  padding: 0.5rem 0.6rem;
+  text-align: left;
+  border-bottom: 1px solid #eee;
+}
+
+.pd-detections-table th {
+  background: #f5f5f5;
+  font-weight: 600;
+  color: #555;
+  font-size: 0.8rem;
+}
+
+.pd-severity {
+  display: inline-block;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.pd-severity-low {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.pd-severity-medium {
+  background: #fff3e0;
+  color: #e65100;
+}
+
+.pd-severity-high {
+  background: #ffebee;
+  color: #c62828;
+}
+
 /* ── Responsive ── */
 @media (max-width: 768px) {
   .pd-grid {

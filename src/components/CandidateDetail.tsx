@@ -9,6 +9,7 @@ import {
   type InterviewConfiguration,
 } from '../lib/supabase'
 import InterviewScheduler from './InterviewScheduler'
+import ResumeFileLink from './ResumeFileLink'
 import { sendSelectionEmail } from '../utils/email'
 import './CandidateDetail.css'
 
@@ -34,6 +35,9 @@ export default function CandidateDetail() {
     duration_minutes: 60,
     coding_round: false,
   })
+  const [detections, setDetections] = useState<
+    { id: string; violation_type: string; severity: string; confidence: number; created_at: string; metadata?: { attentionScore?: number } }[]
+  >([])
 
   const loadData = async () => {
     if (!jobId || !resumeId) return
@@ -52,7 +56,7 @@ export default function CandidateDetail() {
         .select('*')
         .eq('resume_id', resumeId)
         .eq('job_description_id', jobId)
-        .single()
+        .maybeSingle()
       setSelection(selData as CandidateSelection | null)
 
       if (selData?.id) {
@@ -60,10 +64,21 @@ export default function CandidateDetail() {
           .from('interview_configurations')
           .select('*')
           .eq('candidate_selection_id', selData.id)
-          .single()
+          .maybeSingle()
         setInterview(intData as InterviewConfiguration | null)
+        if (intData?.id) {
+          const { data: detData } = await supabase
+            .from('cheating_detections')
+            .select('id, violation_type, severity, confidence, created_at, metadata')
+            .eq('interview_id', intData.id)
+            .order('created_at', { ascending: false })
+          setDetections((detData ?? []) as typeof detections)
+        } else {
+          setDetections([])
+        }
       } else {
         setInterview(null)
+        setDetections([])
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load')
@@ -444,18 +459,9 @@ export default function CandidateDetail() {
           )}
           <dt>Resume</dt>
           <dd>
-            {resume.resume_file_url ? (
-              <a
-                href={resume.resume_file_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="link-resume"
-              >
-                View / Download resume
-              </a>
-            ) : (
-              '—'
-            )}
+            <ResumeFileLink resume={resume} className="link-resume">
+              View / Download resume
+            </ResumeFileLink>
           </dd>
         </dl>
       </section>
@@ -555,6 +561,58 @@ export default function CandidateDetail() {
               <span className={`status-badge status-${interview.status}`}>{interview.status}</span>
             </dd>
           </dl>
+        </section>
+      )}
+
+      {interview && (
+        <section className="candidate-detail-section">
+          <h2>🛡️ Cheating detection (after meeting)</h2>
+          {detections.length === 0 ? (
+            <p className="detail-muted">No detection events for this interview yet.</p>
+          ) : (
+            <>
+              <p className="detail-muted">
+                {detections.length} event{detections.length !== 1 ? 's' : ''} recorded during the interview.
+              </p>
+              <div className="detections-summary">
+                {['eyes_away', 'head_turned', 'multiple_faces', 'low_attention', 'tab_switch', 'copy_paste', 'fullscreen_exit', 'mouse_leave'].map((type) => {
+                  const count = detections.filter((d) => d.violation_type === type).length
+                  if (count === 0) return null
+                  return (
+                    <span key={type} className="detection-pill">
+                      {type.replace(/_/g, ' ')}: {count}
+                    </span>
+                  )
+                })}
+              </div>
+              <table className="detections-table">
+                <thead>
+                  <tr>
+                    <th>Time</th>
+                    <th>Type</th>
+                    <th>Severity</th>
+                    <th>Confidence</th>
+                    {detections.some((d) => d.metadata?.attentionScore != null) && <th>Score</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {detections.map((d) => (
+                    <tr key={d.id}>
+                      <td>{formatDateTime(d.created_at)}</td>
+                      <td>{d.violation_type.replace(/_/g, ' ')}</td>
+                      <td>
+                        <span className={`severity-badge severity-${d.severity}`}>{d.severity}</span>
+                      </td>
+                      <td>{Math.round(d.confidence * 100)}%</td>
+                      {detections.some((x) => x.metadata?.attentionScore != null) && (
+                        <td>{d.metadata?.attentionScore ?? '—'}</td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          )}
         </section>
       )}
 
